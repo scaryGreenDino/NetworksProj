@@ -1,4 +1,4 @@
-all: kdc sender reciever clean
+all: sender reciever clean
 
 sender: sender.o 
 	g++ -o sender sender.o 
@@ -14,4 +14,4 @@ reciever.o:
 
 clean:
 	rm -f *~
-	rm -f *.o
+	rm -f *.ovim 

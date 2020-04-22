@@ -11,49 +11,13 @@
 #include <cstdlib>
 #include <sys/stat.h>
 
-void printHex(string str, int length);
-
 using namespace std;
 
 void printHex(string str, int length);
-
-//Random Number generator
-long f(long nonce)
-{
-	const long A = 48271;
-	const long M = 2147483647;
-	const long Q = M / A;
-	const long R = M % A;
-
-	static long state = 1;
-	long t = A * (state % Q) - R * (state / Q);
-
-	if (t > 0)
-		state = t;
-	else
-		state = t + M;
-	return (long)(((double)state / M) * nonce);
-}
+string vectToString(vector<char> buffer);
 
 int main(int argc, char *argv[])
 {
-	int DEBUG = 1;
-	/*
-	if(argc > 0 && argv[1] == "-d"){
-		# define DEBUG 1 //space inserted to prevent preprocessor because wasn't working for us
-	}
-	else {
-		# define DEBUG 0
-	}
-	*/
-	/*
-	if(argc > 0 && argv[1] == "-d"){
-		DEBUG = 1;
-	}
-	else {
-		DEBUG = 0;
-	}
-	*/
 	//	Create a socket
 
 	int protocol;
@@ -86,144 +50,26 @@ int main(int argc, char *argv[])
 	cout << "6. Situational Errors: ";
 	cout << endl;
 	cin >> situationalErrors;
-	int sock = socket(AF_INET, SOCK_STREAM, 0);
-	if (sock == -1)
-	{
-		return 1;
-	}
 
-	//	Create a hint structure for the server we're connecting with
+	// int sock = socket(AF_INET, SOCK_STREAM, 0);
+	// if (sock == -1)
+	// {
+	// 	return 1;
+	// }
+
+	// //	Create a hint structure for the server we're connecting with
 	int port = 9808;
-	string ipAddress = "10.35.195.46";
+	// string ipAddress = "10.35.195.46";
 
-	sockaddr_in hint;
-	hint.sin_family = AF_INET;
-	hint.sin_port = htons(port);
-	inet_pton(AF_INET, ipAddress.c_str(), &hint.sin_addr);
+	// sockaddr_in hint;
+	// hint.sin_family = AF_INET;
+	// hint.sin_port = htons(port);
+	// inet_pton(AF_INET, ipAddress.c_str(), &hint.sin_addr);
 
-	//	Connect to the sender to the KDC----------------------------->
-	int connectRes = connect(sock, (sockaddr *)&hint, sizeof(hint));
-	if (connectRes == -1)
-	{
-		return 1;
-	}
+	// //--------------------------------------------------------------->
 
-	//--------------------------------------------------------------->
-
-	char buf[4096];
-	string userInput;
-
-	//---Request-Key------------------------------------------------>
-
-	userInput = "Requesting Session key for (IDB).";
-
-	int sendRes = send(sock, userInput.c_str(), userInput.size() + 1, 0);
-	if (sendRes == -1)
-	{
-		cout << "Could not request the session key of B from the KDC! Whoops!\r\n";
-	}
-
-	memset(buf, 0, 4096);
-
-	cout << "Sent (KDC):" << endl;
-	cout << "   Request:" << endl;
-	cout << "   KS for (IDB)" << endl;
-	cout << "   Nonce_A = "; //Test num = 6920123456;
-	getline(cin, userInput);
-
-	string nonce = userInput; //Store nonce for later use
-
-	sendRes = send(sock, userInput.c_str(), userInput.size() + 1, 0);
-	if (sendRes == -1)
-	{
-		cout << "Could not send the Nonce to the KDC! Whoops!\r\n";
-	}
-
-	cout << endl;
-
-	//---Request-Key------------------------------------------------>
-
-	// Recieve package---------------------------------------------->
-
-	string encPackage;
-
-	//		Wait for response
-	memset(buf, 0, 4096);
-	int bytesReceived = recv(sock, buf, 4096, 0);
-	if (bytesReceived == -1)
-	{
-		cout << "There was an error getting response from (the KDC)\r\n";
-	}
-	else
-	{
-		//		Store encoded package
-		encPackage = string(buf, bytesReceived);
-	}
-
-	if (DEBUG)
-	{
-		//send 1
-		printHex(encPackage, encPackage.length());
-	}
-
-	// Recieve package---------------------------------------------->
-
-	// Get user input----------------------------------------------->
-
-	string aKey;
-	cout << "Recieved from (KDC): " << endl;
-	cout << "   Enter (IDa) Key: "; //22222222
-	getline(cin, aKey);
-
-	int paddingAKey = 8 - (aKey.length() % 8);
-	for (int i = 0; i < paddingAKey; i++)
-	{
-		aKey = aKey + "0";
-	}
-
-	vector<char> senderKey(aKey.begin(), aKey.end());
-
-	// Get user input----------------------------------------------->
-
-	// Decode and parse Package----------------------------------------------->
-
-	vector<char> enc(encPackage.begin(), encPackage.end());
-	int vecSize = enc.size();
-
-	Blowfish blowfish(senderKey);
-
-	// Blowfish object used to decrypt the package
-	vector<char> dec = blowfish.Decrypt(enc);
-	string decPack(dec.begin(), dec.end());
-
-	string delimiter = "/";
-
-	// The returned session key
-	string sKey = decPack.substr(0, decPack.find(delimiter));
-	decPack.erase(0, decPack.find(delimiter) + delimiter.length());
-	cout << "   Session Key: " << sKey << endl;
-
-	vector<char> sessKey(sKey.begin(), sKey.end());
-
-	// The original request from IDa
-	string req = decPack.substr(0, decPack.find(delimiter));
-	decPack.erase(0, decPack.find(delimiter) + delimiter.length());
-
-	// The returned nonce
-	string retNonce = decPack.substr(0, decPack.find(delimiter));
-	decPack.erase(0, decPack.find(delimiter) + delimiter.length());
-	cout << "   Nonce_A: " << retNonce << endl;
-	cout << endl;
-
-	//Encrypted package to send to the Reciever
-	string recPackage = decPack;
-	if (DEBUG)
-	{
-		cout << "Session and nonce 1:" << endl;
-		printHex(recPackage, recPackage.length());
-	}
-
-	// Decode Package----------------------------------------------->
+	// char buf[4096];
+	// string userInput;
 
 	// Create a socket and connect to the reciever------------------>
 
@@ -247,28 +93,11 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	//	Close the kdc socket
-	close(sock);
-
 	//--------------------------------------------------------------->
 
 	//sets data out
 	char bufArray[4096];
 	string input;
-
-	// Send package to Reciever------------------------------------->
-
-	sendRes = send(recieverSock, recPackage.c_str(), recPackage.size() + 1, 0);
-	if (sendRes == -1)
-	{
-		cout << "Could not send the Encrypted Package to the Reciever! Whoops!\r\n";
-	}
-
-	cout << "Sent to (IDb):" << endl;
-	cout << "	Sent Session Key and IDa." << endl;
-	cout << endl;
-
-	// Send package to Reciever------------------------------------->
 
 	// Reciever Nonce_B encrypted by session key from reciever--------->
 
@@ -283,58 +112,12 @@ int main(int argc, char *argv[])
 	//		Display response
 	string recStr = con.buffToString(bufArray, bytesRec);
 
-	if (DEBUG)
-	{
-		cout << "nonce 2:" << endl;
-		printHex(recStr, recStr.length());
-	}
-	cout << "Recieved from (IDb): " << endl;
-	vector<char> recVec = con.stringToVec(recStr, recStr.length());
-
-	// Reciever Nonce_B encrypted by session key from reciever--------->
-
-	// Decrypt nonce_B----------------------------------------------->
-
-	Blowfish sessionBlow(sessKey);
-	vector<char> decVec = sessionBlow.Decrypt(recVec);
-	string decStr = con.vecToString(decVec);
-
-	//Convert Nonce_B from String->Long
-	long beforeFunction = con.stringToLong(decStr);
-
-	//cout << "Decrypted Nonce: " << decStr << " of length " << decStr.length() << endl;
-
-	// Decrypt nonce_B----------------------------------------------->
-
-	// Run Nonce_B through function()------------------------------->
-
-	Function function;
-	long afterFunction = function.func(beforeFunction);
-	string geek = con.longToString(afterFunction);
-
-	cout << "	Randomized Nonce_B: " << afterFunction << endl;
-
-	// Run Nonce_B through function()------------------------------->
-
-	// Encrypt and Send to Reciever for Step 5---------------------->
-
-	// Encrypt
-	vector<char> aftFuncVec = con.stringToVec(geek, geek.length());
-	vector<char> aftFuncEnc = sessionBlow.Encrypt(aftFuncVec);
-	string aftEncStr = con.vecToString(aftFuncEnc);
-
-	if (DEBUG)
-	{
-		cout << "nonce 2 after function:" << endl;
-		printHex(aftEncStr, aftEncStr.length());
-	}
-
 	// Send to Reciever
-	int sendRe = send(recieverSock, aftEncStr.c_str(), aftEncStr.size(), 0);
-	if (sendRe == -1)
-	{
-		cout << "Could not send to server! Whoops!\r\n";
-	}
+	// int sendRe = send(recieverSock, aftEncStr.c_str(), aftEncStr.size(), 0);
+	// if (sendRe == -1)
+	// {
+	// 	cout << "Could not send to server! Whoops!\r\n";
+	// }
 
 	cout << endl;
 
@@ -380,7 +163,7 @@ int main(int argc, char *argv[])
 
 	} //wait for 'y'
 
-	sendRe = send(recieverSock, numberB.c_str(), numberB.size(), 0);
+	int sendRe = send(recieverSock, numberB.c_str(), numberB.size(), 0);
 	if (sendRe == -1)
 	{
 		cout << "Could not send to server! Whoops!\r\n";
@@ -403,19 +186,9 @@ int main(int argc, char *argv[])
 	for (int i = 0; i < numBuffers; i++)
 	{
 		fin.read(buffer.data(), buffer.size());
-		if (DEBUG)
-		{
-			string toPrint;
-			//for (int w = 0; w < buffer.size(); w++) {
-			//	toPrint = toPrint + buffer.data()[w];
-			//}
-			//printHex(toPrint, buffer.size());
-		}
-		result = con.vecToString(sessionBlow.Encrypt(buffer));
-		if (DEBUG)
-		{
-			printHex(result, bufferSize);
-		}
+
+		//TODO turn buffer to string
+		result = vectToString(buffer);
 
 		//==================================get a char from the server==================================
 
@@ -439,19 +212,7 @@ int main(int argc, char *argv[])
 	{
 		std::vector<char> lastBuffer(remainingBytesInFile, 0);
 		fin.read(lastBuffer.data(), remainingBytesInFile);
-		if (DEBUG)
-		{
-			string toPrint;
-			//for (int w = 0; w < buffer.size(); w++) {
-			//	toPrint = toPrint + buffer.data()[w];
-			///}
-			//printHex(toPrint, buffer.size());
-		}
-		result = con.vecToString(sessionBlow.Encrypt(lastBuffer));
-		if (DEBUG)
-		{
-			printHex(result, bufferSize);
-		}
+
 		sendRe = send(recieverSock, result.c_str(), result.size(), 0);
 		if (sendRe == -1)
 		{
@@ -485,4 +246,9 @@ void printHex(string str, int length)
 		cout << ":";
 	}
 	cout << endl;
+}
+
+string vectToString(vector<char> buffer)
+{
+	return "";
 }
