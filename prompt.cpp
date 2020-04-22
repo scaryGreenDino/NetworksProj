@@ -1,8 +1,8 @@
-#include<iostream>
+#include <iostream>
 using namespace std;
 
-
-main() {
+main()
+{
 
 	int protocol;
 	int packetSize;
@@ -10,7 +10,7 @@ main() {
 	int slidingWindowSize;
 	int sequenceNumberRange;
 	int situationalErrors;
-	
+
 	cout << "1. Which protocol: ";
 	cout << endl;
 	cin >> protocol;
@@ -19,7 +19,7 @@ main() {
 	cout << endl;
 	cin >> packetSize;
 
-	cout << "3. Timeout interval: "; 
+	cout << "3. Timeout interval: ";
 	cout << endl;
 	cin >> timeoutInterval;
 
@@ -34,7 +34,6 @@ main() {
 	cout << "6. Situational Errors: ";
 	cout << endl;
 	cin >> situationalErrors;
- 
 
 	return 0;
-	}
+}
