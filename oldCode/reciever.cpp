@@ -10,36 +10,17 @@
 #include <cstdlib>
 #include <time.h>
 
-void printHex(string str, int length);
-
 using namespace std;
 
+string buffToString(char *buf, int bytes);
 void printHex(string str, int length);
+string vecToString(vector<char> buffer);
+vector<char> charToVec(char *str, int length);
 
 int main(int argc, char *argv[])
 {
-	int DEBUG = 1;
-	/*
-	if(argc > 0 && argv[1] == "-d"){
-		# define DEBUG 1 //space inserted to prevent preprocessor because wasn't working for us
-	}
-	else {
-		# define DEBUG 0
-	}
-	*/
-	/*
-	if(argc > 0 && argv[1] == "-d"){
-		DEBUG = 1;
-	}
-	else {
-		DEBUG = 0;
-	}
-	*/
-	// Makes a converter for all the String to vector<char> conversions
-	Convert con;
-
 	// Create a socket------------------------------------------------------->
-	int listening = socket(AF_INET, SOCK_STREAM, 0);
+	int listening = socket(AF_INET, SOCK_DGRAM, 0);
 	if (listening == -1)
 	{
 		cerr << "Can't create a socket! Quitting" << endl;
@@ -48,10 +29,13 @@ int main(int argc, char *argv[])
 	sockaddr_in hint;
 	hint.sin_family = AF_INET;
 	hint.sin_port = htons(9802);
-	inet_pton(AF_INET, "10.35.195.49", &hint.sin_addr); //Thing3
-	//inet_pton(AF_INET, "10.35.195.22", &hint.sin_addr); //Thing2
+	// inet_pton(AF_INET, "10.35.195.49", &hint.sin_addr); //Thing3
+	inet_pton(AF_INET, "10.35.195.22", &hint.sin_addr); //Thing2
 
 	bind(listening, (sockaddr *)&hint, sizeof(hint));
+	char buf[4096];
+	memset(buf, 0, 4096);
+	int bytesReceived = recvfrom(clientSocket, buf, 4096, 0, (sockaddr *)&client, &clientSize);
 
 	// gets the client
 	listen(listening, SOMAXCONN);
@@ -84,35 +68,9 @@ int main(int argc, char *argv[])
 	char buf[4096];
 	memset(buf, 0, 4096);
 
-	// Gets the input from the user-------(Nonce_B)-(Key_B)------------------>
-
-	// Get IDb Key
-	string bKeyStr;
-	cout << "Enter (IDb) Key: ";
-	getline(cin, bKeyStr);
-
-	// Get Nonce_B from user
-	string senderRandomNumber;
-	cout << "Nonce_B: ";
-	getline(cin, senderRandomNumber);
-
-	// Pad the key to a multiple of 8
-	int recKeyNumZeros = 8 - (bKeyStr.length() % 8);
-	for (int i = 0; i < recKeyNumZeros; i++)
-	{
-		bKeyStr = bKeyStr + "0";
-	}
-
-	cout << endl;
-
-	//Format IDb Key
-	vector<char> bKey(bKeyStr.begin(), bKeyStr.end());
-
-	// Gets the input from the user-------(Nonce_B)-(Key_B)------------------>
-
 	// Recieving Package from step 3------------------------------------------------->
 
-	int bytesReceived = recv(clientSocket, buf, 4096, 0);
+	bytesReceived = recvfrom(clientSocket, buf, 4096, 0, (sockaddr *)&client, &clientSize);
 	if (bytesReceived == -1)
 	{
 		cerr << "Error in recv(). Quitting" << endl;
@@ -120,124 +78,12 @@ int main(int argc, char *argv[])
 	}
 
 	string package = string(buf, 0, bytesReceived);
+	cout << package;
+	cout << endl;
 
 	// Recieving Package from step 3------------------------------------------------->
 
 	// decrypting step 3
-	Blowfish blow(bKey);
-	string recEncStr(buf, 0, bytesReceived);
-
-	if (DEBUG)
-	{
-		cout << "Session and nonce 1:" << endl;
-		printHex(recEncStr, bytesReceived);
-	}
-	vector<char> recEncVec(recEncStr.begin(), recEncStr.end());
-	vector<char> decVec = blow.Decrypt(recEncVec);
-	string decStr(decVec.begin(), decVec.end());
-	//cout << "	Decrypted String: " << decStr << endl;
-
-	// Separate Session key and IDa
-	string delimiter = "/";
-	string sKey = decStr.substr(0, decStr.find(delimiter));
-	string idA = decStr.erase(0, decStr.find(delimiter) + delimiter.length());
-
-	//Format Session Key and Nonce_B
-	vector<char> sessionKey(sKey.begin(), sKey.end());
-	long nonce = con.stringToLong(senderRandomNumber);
-
-	cout << "Recieved from (IDa): " << endl;
-	cout << "   Session Key: " << sKey << endl;
-	cout << "	Nonce_B: " << nonce << endl;
-	cout << endl;
-
-	//Create blowfish with the Session Key
-	Blowfish sessionBlow(sessionKey);
-
-	// Randomize Nonce_B using function(nonce)------------------------------------------------------->
-
-	Function fun;
-	long funNonce = fun.func(nonce);
-	string nonceStr = con.longToString(nonce);
-
-	// Randomize Nonce_B using function(nonce)------------------------------------------------------->
-
-	// Encrypting and Sending Nonce_B for Step 4---------------------------------------->
-
-	//Encrypt Nonce_B
-	vector<char> conVec = con.stringToVec(nonceStr, nonceStr.length());
-	vector<char> encConVec = sessionBlow.Encrypt(conVec);
-	string encConStr(encConVec.begin(), encConVec.end());
-
-	if (DEBUG)
-	{
-		cout << "nonce 2:" << endl;
-		printHex(encConStr, encConStr.length());
-	}
-
-	//Print response
-	cout << "Send to (IDa): " << endl;
-	cout << "	Nonce_B" << endl;
-	cout << endl;
-
-	//Sending Encrypted Nonce_B
-	memset(buf, 0, 4096);
-	strcpy(buf, encConStr.c_str());
-	send(clientSocket, buf, encConStr.length(), 0);
-
-	// Encrypting and Sending Nonce_B for Step 4---------------------------------------->
-
-	// Recieve from IDa for Step 5---f(Nonce_B)------------------------------------------------------>
-
-	cout << "Received from (IDa): " << endl;
-	cout << "   Recieved Nonce." << endl;
-
-	memset(buf, 0, 4096);
-	bytesReceived = recv(clientSocket, buf, 4096, 0);
-	if (bytesReceived == -1)
-	{
-		cerr << "	Error in recv(). Quitting" << endl;
-		return -1;
-	}
-
-	string afterFunc(buf, 0, bytesReceived);
-
-	if (DEBUG)
-	{
-		cout << "nonce 2 after function:" << endl;
-		printHex(afterFunc, afterFunc.length());
-	}
-
-	vector<char> afterFunEncVec;
-	for (int i = 0; i < bytesReceived; i++)
-	{
-		//cout << +(buf[i]) << " ";
-		afterFunEncVec.push_back(buf[i]);
-	}
-
-	// Recieve from IDa for Step 5---f(Nonce_B)------------------------------------------------------>
-
-	// Decrypt and Match Nonce for Step 5--------------------------------------------------------------->
-
-	vector<char> afterFunDecVec = sessionBlow.Decrypt(afterFunEncVec);
-	string afterFunDecStr(afterFunDecVec.begin(), afterFunDecVec.end());
-	long longAfterFun = con.stringToLong(afterFunDecStr);
-
-	cout << "	Validating Nonce.....";
-
-	if (longAfterFun == funNonce)
-	{
-		cout << "Nonce Matched" << endl;
-	}
-	else
-	{
-		cout << "PRETENDER (Nonce!=Match)" << endl;
-	}
-
-	cout << endl;
-
-	// Decrypt and Match Nonce for Step 5--------------------------------------------------------------->
-
 	/* 
 		*README*
 		When Starting on the Thingys, start KDC then Sender then Reciever.
@@ -256,7 +102,8 @@ int main(int argc, char *argv[])
 	getline(cin, outputname);
 	char start[1];
 	start[0] = 'y';
-	send(clientSocket, start, 1, 0);
+	//TODO uncomment
+	//sendto(clientSocket, start, 1, 0, (sockaddr *)&hint, sizeof(hint));
 	// ~File transfer~
 	int bufferSize = 2056;
 
@@ -317,27 +164,11 @@ int main(int argc, char *argv[])
 			}
 			totalBytes = 0;
 		}
-		if (DEBUG)
-		{
-			string toPrint;
-			//for (int w = 0; w < bufferSize; w++) {
-			//	toPrint = toPrint + buf[w];
-			//}
-			//printHex(toPrint, bufferSize);
-		}
-		vector<char> decVec = sessionBlow.Decrypt(con.charToVec(buf, bufferSize));
-		if (DEBUG)
-		{
-			printHex(con.vecToString(decVec), bufferSize);
-		}
-		//output.write("recieve chunk:=================================================\n", sizeof(char)*64);
-		output.write(decVec.data(), sizeof(char) * 2048);
-
+		vector<char> buffVec = charToVec(buf, bytesReceived);
 		cout << " recieve chunk:" << i << "\n";
-
 		//==================================send a char back to server==================================
-
-		send(clientSocket, finished, 1, 0);
+		//TODO UNCOMMENT
+		// sendto(clientSocket, finished, 1, 0, clientSocketAdress, socketLength);
 
 		//==============================================================================================
 	}
@@ -361,19 +192,7 @@ int main(int argc, char *argv[])
 				}
 				totalBytes2 = 0;
 			}*/
-		if (DEBUG)
-		{
-			string toPrint;
-			//for (int i = 0; i < bufferSize; i++) {
-			//toPrint = toPrint + buf[i];
-			///}
-			//printHex(toPrint, bufferSize);
-		}
-		vector<char> decVec = sessionBlow.Decrypt(con.charToVec(buf, remainingBytes));
-		if (DEBUG)
-		{
-			printHex(con.vecToString(con.charToVec(buf, remainingBytes)), bufferSize);
-		}
+		vector<char> decVec = charToVec(buf, remainingBytes);
 		//output.write("recieve chunk:=================================================\n", sizeof(char)*64);
 		output.write(decVec.data(), sizeof(char) * remainingBytes_origin);
 		cout << "Recieve last chunk!!\n";
@@ -403,4 +222,23 @@ void printHex(string str, int length)
 		cout << ":";
 	}
 	cout << endl;
+}
+string vecToString(vector<char> vec)
+{
+	string s(vec.begin(), vec.end());
+	return s;
+}
+string buffToString(char *buf, int bytes)
+{
+	string part(buf, 0, bytes);
+	return part;
+}
+vector<char> charToVec(char *str, int length)
+{
+	vector<char> result;
+	for (int i = 0; i < length; i++)
+	{
+		result.push_back(str[i]);
+	}
+	return result;
 }

@@ -13,8 +13,9 @@
 
 using namespace std;
 
+string buffToString(char *buf, int bytes);
 void printHex(string str, int length);
-string vectToString(vector<char> buffer);
+string vecToString(vector<char> buffer);
 
 int main(int argc, char *argv[])
 {
@@ -31,25 +32,25 @@ int main(int argc, char *argv[])
 	cout << endl;
 	cin >> protocol;
 
-	cout << "2. What would you like for size of Packet: ";
-	cout << endl;
-	cin >> packetSize;
+	// cout << "2. What would you like for size of Packet: ";
+	// cout << endl;
+	// cin >> packetSize;
 
-	cout << "3. Timeout interval: ";
-	cout << endl;
-	cin >> timeoutInterval;
+	// cout << "3. Timeout interval: ";
+	// cout << endl;
+	// cin >> timeoutInterval;
 
-	cout << "4. Size of sliding window: ";
-	cout << endl;
-	cin >> slidingWindowSize;
+	// cout << "4. Size of sliding window: ";
+	// cout << endl;
+	// cin >> slidingWindowSize;
 
-	cout << "5. Range of sequence numbers: ";
-	cout << endl;
-	cin >> sequenceNumberRange;
+	// cout << "5. Range of sequence numbers: ";
+	// cout << endl;
+	// cin >> sequenceNumberRange;
 
-	cout << "6. Situational Errors: ";
-	cout << endl;
-	cin >> situationalErrors;
+	// cout << "6. Situational Errors: ";
+	// cout << endl;
+	// cin >> situationalErrors;
 
 	// int sock = socket(AF_INET, SOCK_STREAM, 0);
 	// if (sock == -1)
@@ -59,12 +60,12 @@ int main(int argc, char *argv[])
 
 	// //	Create a hint structure for the server we're connecting with
 	int port = 9808;
-	// string ipAddress = "10.35.195.46";
+	string ipAddress = "10.35.195.46";
 
-	// sockaddr_in hint;
-	// hint.sin_family = AF_INET;
-	// hint.sin_port = htons(port);
-	// inet_pton(AF_INET, ipAddress.c_str(), &hint.sin_addr);
+	sockaddr_in hint;
+	hint.sin_family = AF_INET;
+	hint.sin_port = htons(port);
+	inet_pton(AF_INET, ipAddress.c_str(), &hint.sin_addr);
 
 	// //--------------------------------------------------------------->
 
@@ -73,16 +74,18 @@ int main(int argc, char *argv[])
 
 	// Create a socket and connect to the reciever------------------>
 
-	Convert con; // For String->Vector<char> conversions
-	int recieverSock = socket(AF_INET, SOCK_STREAM, 0);
+	int recieverSock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (recieverSock == -1)
 	{
+		cout << "Ending";
+		cout << endl;
 		return 1;
 	}
-
+	cout << "socket";
+	cout << endl;
 	port = 9802;
-	//string ipAddressReciever = "10.35.195.22"; //Thing2
-	string ipAddressReciever = "10.35.195.49"; //Thing3
+	string ipAddressReciever = "10.35.195.22"; //Thing2
+	// string ipAddressReciever = "10.35.195.49"; //Thing3
 	sockaddr_in hitReciever;
 	hitReciever.sin_family = AF_INET;
 	hitReciever.sin_port = htons(port);
@@ -98,10 +101,13 @@ int main(int argc, char *argv[])
 	//sets data out
 	char bufArray[4096];
 	string input;
+	unsigned int clientSize = sizeof(hint);
 
 	// Reciever Nonce_B encrypted by session key from reciever--------->
-
+	int sendRe = sendto(recieverSock, "ABC", 3, 0, (sockaddr *)&hint, sizeof(hint));
 	memset(bufArray, 0, 4096);
+	int bytesReceived = recvfrom(recieverSock, bufArray, 4096, 0, (sockaddr *)&hint, &clientSize);
+
 	int bytesRec = recv(recieverSock, bufArray, 4096, 0);
 	if (bytesRec == -1)
 	{
@@ -110,7 +116,7 @@ int main(int argc, char *argv[])
 	}
 
 	//		Display response
-	string recStr = con.buffToString(bufArray, bytesRec);
+	string recStr = buffToString(bufArray, bytesRec);
 
 	// Send to Reciever
 	// int sendRe = send(recieverSock, aftEncStr.c_str(), aftEncStr.size(), 0);
@@ -163,7 +169,7 @@ int main(int argc, char *argv[])
 
 	} //wait for 'y'
 
-	int sendRe = send(recieverSock, numberB.c_str(), numberB.size(), 0);
+	sendRe = send(recieverSock, numberB.c_str(), numberB.size(), 0);
 	if (sendRe == -1)
 	{
 		cout << "Could not send to server! Whoops!\r\n";
@@ -188,7 +194,7 @@ int main(int argc, char *argv[])
 		fin.read(buffer.data(), buffer.size());
 
 		//TODO turn buffer to string
-		result = vectToString(buffer);
+		result = vecToString(buffer);
 
 		//==================================get a char from the server==================================
 
@@ -248,7 +254,13 @@ void printHex(string str, int length)
 	cout << endl;
 }
 
-string vectToString(vector<char> buffer)
+string vecToString(vector<char> vec)
 {
-	return "";
+	string s(vec.begin(), vec.end());
+	return s;
+}
+string buffToString(char *buf, int bytes)
+{
+	string part(buf, 0, bytes);
+	return part;
 }

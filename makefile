@@ -1,20 +1,20 @@
-all: sender reciever clean
+all: server client clean
 
-sender: sender.o convert.o
-	g++ -o sender sender.o convert.o
+server: server.o checksum.o
+	g++ -o server server.o checksum.o
 
-reciever: reciever.o convert.o
-	g++ -o reciever reciever.o convert.o
+client: client.o checksum.o
+	g++ -o client client.o checksum.o
 
-sender.o:
-	g++ -c sender.cpp -std=c++11 
+server.o:
+	g++ -c server.cpp -std=c++11 
 
-reciever.o:
-	g++ -c reciever.cpp 
+client.o:
+	g++ -c client.cpp 
 
-convert.o:
-	g++ -c convert.cpp
+checksum.o:
+	g++ -c checksum.cpp
 
 clean:
 	rm -f *~
-	rm -f *.ovim 
+	rm -f *.o
