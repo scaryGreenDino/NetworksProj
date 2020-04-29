@@ -23,7 +23,7 @@
 #include <netinet/in.h>
 #include "checksum.h"
 
-#define PORT 9000
+#define PORT 9086
 #define MAXLINE 1024
 using namespace std;
 // Driver code
@@ -115,8 +115,8 @@ int main()
 
     int numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer
     int remainingBytesInFile = (int)sizeOfFile % bufferSize;
-    cout << "numBuffers: " << numBuffers << "\n";
-    cout << "remainingBytesInFile: " << remainingBytesInFile << "\n";
+    cout << "NumBuffers: " << numBuffers << "\n";
+    cout << "RemainingBytesInFile: " << remainingBytesInFile << "\n";
 
     string numberB = to_string(numBuffers);
     string numberRem = to_string(remainingBytesInFile);
@@ -127,6 +127,7 @@ int main()
     int pcksz = sizeof(long) + sizeof(long long int) + 128;
 
     string pckszString = to_string(pcksz);
+    cout << "Packet Size as String: " << pckszString << endl;
 
     int sendRe = sendto(sockfd, pckszString.c_str(), pckszString.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
                         len);

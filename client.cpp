@@ -23,7 +23,7 @@
 #include <netinet/in.h>
 #include <fstream>
 
-#define PORT 9000
+#define PORT 9086
 #define MAXLINE 1024
 using namespace std;
 string buffToString(char *buf, int bytes)
@@ -107,6 +107,9 @@ int main()
 
     memset(buf, 0, bufferSize);
     bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+
+    printf("Recieved from Server: %s\n", buf);
+
     if (bytesReceived == -1)
     {
         cerr << "	Error in recvfrom(). Quitting" << endl;
