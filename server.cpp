@@ -27,8 +27,8 @@
 #define MAXLINE 1024
 using namespace std;
 // Driver code
-struct Packet
-{
+struct Packet {
+
     long sn;
     long long int crc;
     char data[128];
@@ -47,11 +47,12 @@ int main()
     int length = thing1Ip.length() + 1;
     char thing1IpChar[length];
     strcpy(thing1IpChar, thing1Ip.c_str());
+    int frameSize = 5; //This will be whatever the user inputs for frame size
     // string thing3Ip = "";
 
     int sockfd;
     char buffer1[MAXLINE];
-    string tmp = "Hello from client";
+    string tmp = "Hello from server xxxxxxx";
     length = tmp.length() + 1;
     char hello[length];
     strcpy(hello, tmp.c_str());
@@ -132,6 +133,38 @@ int main()
                         len);
 
     //send package 0
+
+    int counter = -1;
+    int packetNumber = 0;
+    int packetsLeft = 20;
+    int totalPackets;
+    int ackNumber = 0;
+    int faultyPacket = 0;
+
+
+    while (packetNumber < packetsLeft ) { // checks to see if there are still more packets
+      if (counter < (packetNumber + 5) ) { // checks to see if counter is less than packet
+        cout << "Send packet " << packetNumber << endl; // sends current packet
+
+      }
+      if (faultyPacket % 5 != 0) { // this will drop every fifth packet, if its not the 5th packet it will send ack
+        cout << "recived ack for Packet " << packetNumber << endl; // sending ack
+        cout << "faultyPacket = " << faultyPacket << endl; // faulty packet number for debug
+
+        packetNumber++; // packet Number
+        counter++; // counter to keep packets in frame
+
+          cout << "counter = " << counter << endl; // counter printout for debugging
+
+      } else {
+          cout << "faultyPacket = " << faultyPacket << " This packet failed to send." << endl; // prints out failed packets
+          cout << "counter = " << counter << endl; // prints out counter for debugging
+
+        }
+        faultyPacket++; // faulty packet incrementer to drop simulate dropping packets
+    }
+
+
 
     // while (start[0] == 'n')
     // {
