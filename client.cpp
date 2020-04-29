@@ -80,11 +80,6 @@ int main()
     {
         printf("Hello message failed.\n");
     }
-    n = recvfrom(sockfd, (char *)buffer1, MAXLINE,
-                 MSG_WAITALL, (struct sockaddr *)&servaddr,
-                 &len);
-    buffer1[n] = '\0';
-    printf("Server : %s\n", buffer1);
 
     // File transfer should theoretically be inserted here*********************************************
 

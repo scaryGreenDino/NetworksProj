@@ -39,15 +39,59 @@ string vecToString(vector<char> vec)
     string s(vec.begin(), vec.end());
     return s;
 }
-int main()
+int main(int argc, char *argv[])
 
 {
+    bool defaultSettings = (argc > 0 && argv[0] == "-d");
+    int protocol;
+    int packetSize;
+    int timeoutInterval;
+    int slidingWindowSize;
+    int sequenceNumberRange;
+    int situationalErrors;
     string thing1Ip = "10.35.195.47";
     string thing2Ip = "10.35.195.22";
+
+    if (defaultSettings)
+    {
+        protocol = 1;
+        packetSize = 1024;
+        timeoutInterval = 10;
+        slidingWindowSize = 50;
+        sequenceNumberRange = 100;
+        situationalErrors = 1;
+    }
+    else
+    {
+        cout << "1. Which protocol: ";
+        cout << endl;
+        cin >> protocol;
+
+        cout << "2. What would you like for size of Packet: ";
+        cout << endl;
+        cin >> packetSize;
+
+        cout << "3. Timeout interval: ";
+        cout << endl;
+        cin >> timeoutInterval;
+
+        cout << "4. Size of sliding window: ";
+        cout << endl;
+        cin >> slidingWindowSize;
+
+        cout << "5. Range of sequence numbers: ";
+        cout << endl;
+        cin >> sequenceNumberRange;
+
+        cout << "6. Situational Errors: ";
+        cout << endl;
+        cin >> situationalErrors;
+        string thing3Ip = "";
+    }
+
     int length = thing1Ip.length() + 1;
     char thing1IpChar[length];
     strcpy(thing1IpChar, thing1Ip.c_str());
-    // string thing3Ip = "";
 
     int sockfd;
     char buffer1[MAXLINE];
@@ -72,7 +116,6 @@ int main()
     servaddr.sin_addr.s_addr = INADDR_ANY;
 
     //Use this line to bind the socket to only this ip address
-    // inet_pton(AF_INET, thing1IpChar, &servaddr.sin_addr);
 
     servaddr.sin_port = htons(PORT);
     socklen_t serverlength = sizeof(servaddr);
@@ -97,13 +140,8 @@ int main()
     buffer1[n] = '\0';
     printf("Client : %s\n", buffer1);
     cout << endl;
-    sendto(sockfd, (const char *)hello, strlen(hello),
-           MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-           len);
-    printf("Hello message sent.\n");
     // ~File transfer~
     string filename;
-
     int bufferSize = 2048;
     cout << "input file name for testing: ";
     // getline(cin, filename);
