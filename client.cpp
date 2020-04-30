@@ -41,6 +41,16 @@ vector<char> charToVec(char *str, int length)
     return result;
 }
 
+void resetAcks(char* ackArray, int winSize) {
+
+    //char ackArray[winSize];
+    for (int i = 0; i < winSize; i++)
+    {
+        ackArray[i] = 'n';
+    }
+
+}
+
 // Driver code
 int main()
 {
@@ -92,8 +102,7 @@ int main()
     char buf[4096];
     memset(buf, 0, 4096);
     string outputname;
-    cout << "output file name for testing:"
-         << "\n";
+    //cout << "output file name for testing:" << "\n";
     // getline(cin, outputname);
     outputname = "outputtest.txt";
     char start[1];
@@ -108,13 +117,64 @@ int main()
     memset(buf, 0, bufferSize);
     bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
 
-    printf("Recieved from Server: %s\n", buf);
+    ///printf("Recieved from Server: %s\n", buf);
 
     if (bytesReceived == -1)
     {
         cerr << "	Error in recvfrom(). Quitting" << endl;
         return -1;
     }
+
+
+
+    //------Begin Selective Repeat-------------------------------------------------->>>
+
+    //Recieved from server
+    int winSize = 5; //Total number a frames inside the window
+    int numBuffers = 20; //Number of packets that need to be sent
+
+    int seqNum = winSize * 3; //Range of sequence numbers given to the frames
+    int currPacket = 0; //Counter that keeps track of how many packets have been sent
+    int rec[winSize];
+    char ackSent[winSize];
+
+    string pkg;
+    resetAcks(ackSent, winSize);
+
+    for (int i = 1; i <= numBuffers; i++)
+    {
+
+        memset(buf, 0, 4096);
+        //cout << pkg << endl;
+
+        if (i % winSize == 0)
+        {
+
+            n = recvfrom(sockfd, (char*)buf, bufferSize, MSG_WAITALL, (struct sockaddr*) &servaddr, &len);
+            pkg = buffToString(buf, bufferSize);
+            cout << "Recieved Packet #" << (currPacket + 1) << ": " << pkg << "...\n" << endl;
+
+            //cout << "Acknowledgement of above frames sent is received by sender\n\n";
+        }
+        else {
+
+            //cout << "Recieving Packet #" << (currPacket + 1) << "..." << endl;
+            n = recvfrom(sockfd, (char*)buf, bufferSize, MSG_WAITALL, (struct sockaddr*) & servaddr, &len);
+            pkg = buffToString(buf, bufferSize);
+            cout << "Recieved Packet #" << (currPacket + 1) << ": " << pkg << "..." << endl;
+
+        }
+
+        //cout << "Current Ack: " << recAck[i % winSize] << endl;
+        currPacket++;
+
+
+    }
+
+
+    //------End Selective Repeat---------------------------------------------------->>>
+
+
     // int numBuffers = atoi(buf);
 
     // memset(buf, 0, bufferSize);

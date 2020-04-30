@@ -39,6 +39,17 @@ string vecToString(vector<char> vec)
     string s(vec.begin(), vec.end());
     return s;
 }
+
+void resetAcks(char* ackArray, int winSize) {
+
+    //char ackArray[winSize];
+    for (int i = 0; i < winSize; i++)
+    {
+        ackArray[i] = 'n';
+    }
+
+}
+
 int main()
 
 {
@@ -102,12 +113,11 @@ int main()
            len);
     printf("Hello message sent.\n");
     // ~File transfer~
-    string filename;
+    string filename = "test.txt";
 
     int bufferSize = 2048;
-    cout << "input file name for testing: ";
+    cout << "input file name for testing: " << filename << endl;
     // getline(cin, filename);
-    filename = "test.txt";
 
     struct stat stat_buf;
     int rc = stat(filename.c_str(), &stat_buf);
@@ -115,8 +125,8 @@ int main()
 
     int numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer
     int remainingBytesInFile = (int)sizeOfFile % bufferSize;
-    cout << "NumBuffers: " << numBuffers << "\n";
-    cout << "RemainingBytesInFile: " << remainingBytesInFile << "\n";
+    //cout << "NumBuffers: " << numBuffers << "\n";
+    //cout << "RemainingBytesInFile: " << remainingBytesInFile << "\n";
 
     string numberB = to_string(numBuffers);
     string numberRem = to_string(remainingBytesInFile);
@@ -131,6 +141,52 @@ int main()
 
     int sendRe = sendto(sockfd, pckszString.c_str(), pckszString.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
                         len);
+
+    //------Begin Selective Repeat-------------------------------------------------->>>
+
+    //User prompt info
+    int winSize = 5; //Total number a frames inside the window
+    numBuffers = 20; //Number of packets that need to be sent
+
+    int seqNum = winSize * 3; //Range of sequence numbers given to the frames
+    int currPacket = 0; //Counter that keeps track of how many packets have been sent
+    int send[winSize];
+    char recAck[winSize];
+
+    string pkg;
+    resetAcks(recAck, winSize);
+
+    for (int i = 1; i <= numBuffers; i++)
+    {
+        
+        pkg = "Packet #" + to_string(i) + " info.";
+        //cout << pkg << endl;
+
+        if (i % winSize == 0)
+        {
+            //cout << frames[i] << "\n";
+            cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
+
+            sendRe = sendto(sockfd, pkg.c_str(), pkg.size(), MSG_CONFIRM, (const struct sockaddr*) &cliaddr, len);
+
+            cout << "Acknowledgement of above frames sent is received by sender\n\n";
+        }
+        else {
+            //cout << frames[i] << " ";
+            cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
+            sendRe = sendto(sockfd, pkg.c_str(), pkg.size(), MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
+
+        }
+
+        //cout << "Current Ack: " << recAck[i % winSize] << endl;
+        currPacket++;
+
+            
+    }
+
+
+    //------End Selective Repeat---------------------------------------------------->>>
+
 
     //send package 0
 
