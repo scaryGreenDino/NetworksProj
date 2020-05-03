@@ -39,20 +39,60 @@ string vecToString(vector<char> vec)
     string s(vec.begin(), vec.end());
     return s;
 }
+
+// char *packetMaker(long long int cs, unsigned short sn, const char *data, int dataSize)  {
+//
+//     int c;
+//     short csSize = 8;
+//     short snSize = 2;
+//     short headerSize = csSize + snSize;
+//     short totalSize = headerSize + dataSize;
+//     char *packet = new char[totalSize];
+//     int totalC = 0;
+//     char csString[csSize];
+//     char snString[snSize];
+//
+//     sprintf(csString, "%X", cs);
+//     sprintf(snString, "%X", sn);
+//     for (int c = 0; c < csSize; c++)
+//     {
+//         packet[c] = csString[c];
+//     }
+//     for (int c = 0; c < snSize; c++)
+//     {
+//         packet[c + csSize] = snString[c];
+//     }
+//     for (int c = headerSize; c < headerSize + dataSize; c++)
+//     {
+//         packet[c] = data[c - headerSize];
+//         totalC++;
+//     }
+//     return packet;
+// }
+
 int main()
 
 {
+
     string thing1Ip = "10.35.195.47";
     string thing2Ip = "10.35.195.22";
     int length = thing1Ip.length() + 1;
     char thing1IpChar[length];
     strcpy(thing1IpChar, thing1Ip.c_str());
-    int frameSize = 5; //This will be whatever the user inputs for frame size
+    int winSize = 10;
+    int winStart = 0;
+    int winEnd = winSize;
+    int totalNumPackets = 31;
+    int window[winSize];
+
+
+
+
     // string thing3Ip = "";
 
     int sockfd;
     char buffer1[MAXLINE];
-    string tmp = "Hello from server xxxxxxx";
+    string tmp = "Initial contact made from server";
     length = tmp.length() + 1;
     char hello[length];
     strcpy(hello, tmp.c_str());
@@ -116,8 +156,21 @@ int main()
 
     int numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer
     int remainingBytesInFile = (int)sizeOfFile % bufferSize;
+    totalNumPackets = numBuffers;
     cout << "numBuffers: " << numBuffers << "\n";
     cout << "remainingBytesInFile: " << remainingBytesInFile << "\n";
+
+    for ( n=0 ; n<winSize ; ++n )
+    {
+      window[n] = n;
+    }
+    cout << "Current Window: ";
+    for(int loop = 0; loop < 10; loop++)
+      printf("%d ", window[loop]);
+      cout << endl;
+     //  cout << window;
+
+
 
     string numberB = to_string(numBuffers);
     string numberRem = to_string(remainingBytesInFile);
@@ -134,113 +187,145 @@ int main()
 
     //send package 0
 
-    int counter = -1;
-    int packetNumber = 0;
-    int packetsLeft = 20;
-    int totalPackets;
-    int ackNumber = 0;
-    int faultyPacket = 0;
+    // int counter = -1;
+    // int packetNumber = 0;
+    // int packetsLeft = 20;
+    // int totalPackets;
+    // int ackNumber = 0;
+    // int faultyPacket = 0;
+    // int framesize = 5;
+    //
+    //
+    //
+    // while (packetNumber < packetsLeft ) { // checks to see if there are still more packets
+    //   if (counter < (packetNumber + framesize) ) { // checks to see if counter is less than packet
+    //     cout << "Send packet " << packetNumber << endl; // sends current packet
+    //
+    //   }
+    //   if (faultyPacket % 5 != 0) { // this will drop every fifth packet, if its not the 5th packet it will send ack
+    //     cout << "recived ack for Packet " << packetNumber << endl; // sending ack
+    //     cout << "faultyPacket = " << faultyPacket << endl; // faulty packet number for debug
+    //
+    //     packetNumber++; // packet Number
+    //     counter++; // counter to keep packets in frame
+    //
+    //       cout << "counter = " << counter << endl; // counter printout for debugging
+    //
+    //   } else {
+    //       cout << "faultyPacket = " << faultyPacket << " This packet failed to send." << endl; // prints out failed packets
+    //       cout << "counter = " << counter << endl; // prints out counter for debugging
+    //
+    //     }
+    //     faultyPacket++; // faulty packet incrementer to drop simulate dropping packets
+    // }
 
 
-    while (packetNumber < packetsLeft ) { // checks to see if there are still more packets
-      if (counter < (packetNumber + 5) ) { // checks to see if counter is less than packet
-        cout << "Send packet " << packetNumber << endl; // sends current packet
+// waits for the server to connect to the server
+    while (start[0] == 'n')
+    {
+        recvfrom(sockfd, start, 1,
+                 MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                 &len);
 
-      }
-      if (faultyPacket % 5 != 0) { // this will drop every fifth packet, if its not the 5th packet it will send ack
-        cout << "recived ack for Packet " << packetNumber << endl; // sending ack
-        cout << "faultyPacket = " << faultyPacket << endl; // faulty packet number for debug
+    } //wait for 'y'
+    cout << "numBuffers: " << numBuffers << "\n";
 
-        packetNumber++; // packet Number
-        counter++; // counter to keep packets in frame
+// Send all the information the client needs
 
-          cout << "counter = " << counter << endl; // counter printout for debugging
-
-      } else {
-          cout << "faultyPacket = " << faultyPacket << " This packet failed to send." << endl; // prints out failed packets
-          cout << "counter = " << counter << endl; // prints out counter for debugging
-
-        }
-        faultyPacket++; // faulty packet incrementer to drop simulate dropping packets
+     sendRe = sendto(sockfd, numberB.c_str(), numberB.size(), MSG_CONFIRM, ( struct sockaddr *)&cliaddr,
+len);
+    if (sendRe == -1)
+    {
+        cout << "Could not send to server! Whoops!\r\n";
     }
 
+    sendRe = sendto(sockfd, numberRem.c_str(), numberRem.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+                    len);
+    if (sendRe == -1)
+    {
+        cout << "Could not send to server! Whoops!\r\n";
+    }
+
+    ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
+    vector<char> buffer(bufferSize, 0);
+    //ofstream output(outputname.c_str(), std::ios::out | std::ios::binary);//used for writing out to a file
+
+    char finished[1];
+    finished[0] = 'y';
+    int numThreads = 5;
+    string result;
+    for (int i = 0; i < numBuffers; i++)
+    {
+        fin.read(buffer.data(), buffer.size());
+
+        cout << i << endl;
+
+        //TODO turn buffer to string
+        result = vecToString(buffer);
+
+        //==================================get a char from the server==================================
+
+        while (finished[0] == 'n')
+        {
+          //  cout << "before recv" << endl;
+            recvfrom(sockfd, finished, 1,
+                     MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                     &len);
+
+        } //wait for 'y'
+      //  cout << "after recv" << endl;
+        //cout << "Finished: " << i;
+        finished[0] = 'n'; //change back to
+
+        //==============================================================================================
+
+        sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, ( struct sockaddr *)&cliaddr,
+                        len);
+                        cout<< "Packet " << i << " sent" << endl;
+                        cout << "Ack " << i << " recieved" << endl;
+                        winStart++;
+                        winEnd++;
+
+                        for ( int n = 0 ; n<winSize ; ++n )
+                        {
+                          window[n] = window[n]+1;
+                        }
+
+    //                    if (i > winSize-1) {
+                          cout << "Current Window: ";
+                          for( int loop = 0; loop < winSize; loop++) {
+                            if (window[loop] < totalNumPackets)
+                            printf("%d ", window[loop]);
+                          }
+                            cout << endl;
+
+      //                  }
 
 
-    // while (start[0] == 'n')
-    // {
-    //     recvfrom(sockfd, start, 1,
-    //              MSG_WAITALL, (struct sockaddr *)&cliaddr,
-    //              &len);
 
-    // } //wait for 'y'
-    // cout << "numBuffers: " << numBuffers << "\n";
-
-    // int sendRe = sendto(sockfd, numberB.c_str(), numberB.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-    //                     len);
-    // if (sendRe == -1)
-    // {
-    //     cout << "Could not send to server! Whoops!\r\n";
+        if (sendRe == -1)
+        {
+            cout << "Could not send to server! Whoops!\r\n";
+        }
     // }
+    if (fin.good())
+    {
+        std::vector<char> lastBuffer(remainingBytesInFile, 0);
+        fin.read(lastBuffer.data(), remainingBytesInFile);
 
-    // sendRe = sendto(sockfd, numberRem.c_str(), numberRem.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-    //                 len);
-    // if (sendRe == -1)
-    // {
-    //     cout << "Could not send to server! Whoops!\r\n";
-    // }
+        sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+                        len);
+        if (sendRe == -1)
+        {
+            cout << "Could not send to server! Whoops!!\r\n";
+        }
+    }
+  }
 
-    // ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
-    // vector<char> buffer(bufferSize, 0);
-    // //ofstream output(outputname.c_str(), std::ios::out | std::ios::binary);//used for writing out to a file
 
-    // char finished[1];
-    // finished[0] = 'y';
-    // int numThreads = 5;
-    // string result;
-    // for (int i = 0; i < numBuffers; i++)
-    // {
-    //     fin.read(buffer.data(), buffer.size());
-
-    //     //TODO turn buffer to string
-    //     result = vecToString(buffer);
-
-    //     //==================================get a char from the server==================================
-
-    //     while (finished[0] == 'n')
-    //     {
-    //         cout << "before recv" << endl;
-    //         recvfrom(sockfd, finished, 1,
-    //                  MSG_WAITALL, (struct sockaddr *)&cliaddr,
-    //                  &len);
-
-    //     } //wait for 'y'
-    //     cout << "after recv" << endl;
-    //     //cout << "Finished: " << i;
-    //     finished[0] = 'n'; //change back to
-
-    //     //==============================================================================================
-
-    //     sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-    //                     len);
-    //     if (sendRe == -1)
-    //     {
-    //         cout << "Could not send to server! Whoops!\r\n";
-    //     }
-    // // }
-    // if (fin.good())
-    // {
-    //     std::vector<char> lastBuffer(remainingBytesInFile, 0);
-    //     fin.read(lastBuffer.data(), remainingBytesInFile);
-
-    //     sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-    //                     len);
-    //     if (sendRe == -1)
-    //     {
-    //         cout << "Could not send to server! Whoops!!\r\n";
-    //     }
-    // }
-    // fin.close();
-    //output.close();
+    fin.close();
+  //  output.close();
 
     return 0;
+
 }
