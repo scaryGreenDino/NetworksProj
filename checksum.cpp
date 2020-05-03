@@ -35,7 +35,7 @@ long long int toDec(string bin)
 }
 
 // function to compute CRC and codeword
-void CRC(string dataword, string generator)
+long long int CRC(string dataword, string generator)
 {
     int l_gen = generator.length();
     long long int gen = toDec(generator);
@@ -52,7 +52,6 @@ void CRC(string dataword, string generator)
 
     while ((dividend >= gen) || (shft >= 0))
     {
-
         // bitwise XOR the MSBs of dividend with generator
         // replace the operated MSBs from the dividend with
         // remainder generated
@@ -67,4 +66,5 @@ void CRC(string dataword, string generator)
     long long int codeword = (dword << (l_gen - 1)) | dividend;
     cout << "Remainder: " << toBin(dividend) << endl;
     cout << "Codeword : " << toBin(codeword) << endl;
+    return codeword;
 }

@@ -26,19 +26,52 @@
 #define PORT 9000
 #define MAXLINE 1024
 using namespace std;
-string buffToString(char *buf, int bytes)
+struct Packet
 {
-    string part(buf, 0, bytes);
-    return part;
+    short sn;
+    uint32_t crc;
+    char *data;
+};
+const uint32_t Polynomial = 0xEDB88320;
+string buffToString(char *buf, int bytes);
+vector<char> charToVec(char *str, int length);
+
+char *substr(char *arr, int begin, int len)
+{
+    char *res = new char[len];
+    for (int i = 0; i < len; i++)
+        res[i] = *(arr + begin + i);
+    res[len] = 0;
+    return res;
 }
-vector<char> charToVec(char *str, int length)
+uint32_t crc32_bitwise(const void *data, size_t length, uint32_t previousCrc32 = 0)
 {
-    vector<char> result;
-    for (int i = 0; i < length; i++)
+    uint32_t crc = ~previousCrc32; // same as previousCrc32 ^ 0xFFFFFFFF
+    unsigned char *current = (unsigned char *)data;
+    while (length--)
     {
-        result.push_back(str[i]);
+        crc ^= *current++;
+        for (unsigned int j = 0; j < 8; j++)
+            if (crc & 1)
+                crc = (crc >> 1) ^ Polynomial;
+            else
+                crc = crc >> 1;
     }
-    return result;
+    return ~crc; // same as crc ^ 0xFFFFFFFF
+}
+
+struct Packet charsToPacket(char *chars, int dataSize)
+{
+    int c;
+    short csSize = 4;
+    short snSize = 2;
+    struct Packet packet;
+    char *cs = substr(chars, 0, 3);
+    char *sn = substr(chars, 4, 5);
+    packet.crc = stoi(cs, NULL, 16);
+    packet.sn = stoi(sn, NULL, 16);
+    packet.data = substr(chars, 6, dataSize - 1);
+    return packet;
 }
 
 // Driver code
@@ -107,124 +140,29 @@ int main()
         cerr << "	Error in recvfrom(). Quitting" << endl;
         return -1;
     }
-    // int numBuffers = atoi(buf);
-
-    // memset(buf, 0, bufferSize);
-    // bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-
-    // if (bytesReceived == -1)
-    // {
-    //     cerr << "	Error in recvfrom(). Quitting" << endl;
-    //     return -1;
-    // } //"< bufferSize"
-
-    // int remainingBytes = atoi(buf); //deccryption doubles size of message
-    // int remainingBytes_origin = remainingBytes;
-    // if (remainingBytes % 8 != 0)
-    // {
-    //     remainingBytes = (8 - remainingBytes % 8) + remainingBytes;
-    // }
-
-    // ofstream output(outputname.c_str(), std::ios::out | std::ios::binary); //used for writing out to a file
-
-    // cout << numBuffers << " is numBuffers\n";
-    // cout << remainingBytes << " is remaining bytes\n";
-    // cout << outputname << " is output name\n";
-
-    // char finished[1];
-    // finished[0] = 'y';
-
-    // int totalBytes;
-    // int lengthOfString;
-
-    // memset(buf, 0, bufferSize);
-    // bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-
-    // bytesReceived = recvfrom(sockfd, rcv, sizeof(Package), MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-
-    // //TODO uncomment
-    // sendto(sockfd, start, 1,
-    //        MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-    //        serversize);
-
-    // for (int i = 0; i < numBuffers; i++)
-    // {
-    //     memset(buf, 0, bufferSize);
-    //     bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-    //     totalBytes = bytesReceived;
-    //     if (bytesReceived < bufferSize)
-    //     {
-    //         while (totalBytes <= bufferSize)
-    //         {
-    //             cout << "stuck" << endl;
-
-    //             char start[1];
-    //             start[0] = 'y';
-    //             //TODO uncomment
-    //             sendto(sockfd, start, 1,
-    //                    MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-    //                    serversize);
-    //             bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-    //             // cout << " Buffer :" << buf << endl;
-    //             cout << "Total byte: " << totalBytes << endl;
-    //             cout << "Buffer Size: " << bufferSize << endl;
-
-    //             totalBytes += bytesReceived;
-    //             if (bytesReceived == -1)
-    //             {
-    //                 cerr << "	Error in recvfrom(). Quitting!" << endl;
-    //                 return -1;
-    //             }
-    //         }
-    //         totalBytes = 0;
-    //     }
-    //     vector<char> buffVec = charToVec(buf, bytesReceived);
-    //     cout << " recieve chunk:" << i << "\n";
-    //     //==================================send a char back to server==================================
-
-    //     //==============================================================================================
-    //     output.write(buffVec.data(), sizeof(char) * 2048);
-    //     cout << "writing to file" << endl;
-    // }
-    // int totalBytes2 = 0;
-    // if (remainingBytes != 0)
-    // {
-    //     memset(buf, 0, bufferSize);
-    //     bytesReceived = recvfrom(sockfd, buf, remainingBytes, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-    //     totalBytes2 = bytesReceived;
-    //     /*
-    // 		if(totalBytes2 < remainingBytes){
-    // 			while(totalBytes2 != remainingBytes){
-    // 				cout<< "in second while"<< totalBytes2 << "\n";
-    // 				bytesReceived = recvfrom(sockfd, buf + totalBytes2, remainingBytes, 0);
-    // 				totalBytes2 += bytesReceived;
-    // 				//insert here here
-    // 				if (bytesReceived == -1){
-    // 					cerr << "	Error in recvfrom(). Quitting!!" << endl;
-    // 					return -1;
-    // 				}
-    // 			}
-    // 			totalBytes2 = 0;
-    // 		}*/
-    //     //output.write("recieve chunk:=================================================\n", sizeof(char)*64);
-    //     cout << "writing to file" << endl;
-    //     vector<char> buffVec = charToVec(buf, bytesReceived);
-    //     cout << buffToString(buf, sizeof(buf)) << endl;
-    //     output.write(buffVec.data(), sizeof(char) * 16);
-
-    //     cout << "Recieve last chunk!!\n";
-    // }
-
-    //read in chunk one by one
-
-    //decrypt each chunk using its own thread
-
-    //put each chunk into file, waiting for previous chunk to be insertd into file
-
-    // File transfer should theoretically be inserted here*********************************************
-
-    // output.close();
+    for (int c; c < 17; c++)
+    {
+        cout << buf[c];
+    }
+    cout << endl;
+    struct Packet packet = charsToPacket(buf, 17);
+    cout << packet.crc << endl;
+    cout << packet.sn << endl;
+    cout << packet.data << endl;
     close(sockfd);
-
     return 0;
+}
+string buffToString(char *buf, int bytes)
+{
+    string part(buf, 0, bytes);
+    return part;
+}
+vector<char> charToVec(char *str, int length)
+{
+    vector<char> result;
+    for (int i = 0; i < length; i++)
+    {
+        result.push_back(str[i]);
+    }
+    return result;
 }
