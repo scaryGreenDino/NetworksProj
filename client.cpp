@@ -51,6 +51,39 @@ void resetAcks(char* ackArray, int winSize) {
 
 }
 
+char* substr(char* arr, int begin, int len)
+{
+    char* res = new char[len];
+    for (int i = 0; i < len; i++)
+        res[i] = *(arr + begin + i);
+    res[len] = 0;
+    return res;
+}
+
+struct Packet
+{
+    short sn;
+    long long int crc;
+    char* data;
+};
+
+struct Packet charsToPacket(char* chars, int dataSize)
+{
+    int c;
+    short csSize = 8;
+    short snSize = 2;
+    struct Packet packet;
+    char* cs = substr(chars, 0, 7);
+    char* sn = substr(chars, 8, 9);
+
+    cout << "Sequence Number: " << sn << endl;
+
+    packet.crc = strtoll(cs, NULL, 16);
+    packet.sn = stoi(sn, NULL, 16);
+    packet.data = substr(chars, 10, dataSize - 1);
+    return packet;
+}
+
 // Driver code
 int main()
 {
@@ -110,6 +143,8 @@ int main()
     memset(buf, 0, 4096);
     string outputname = "outputtest.txt";
 
+    //---Recieve necessary info from Server before transfer----------------->>>
+
      memset(buf, 0, bufferSize);
      bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
      printf("Contents of Buf #1: %s\n", buf); // This recieve gets numBuffers
@@ -125,6 +160,9 @@ int main()
      bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
      printf("Contents of Buf #2: %s\n", buf); //This recieve gets remainingBytes
      int remainingBytes = atoi(buf); //deccryption doubles size of message
+
+     //---End Recieve----------------------------------------------------->>>
+
 
      if (remainingBytes % 8 != 0)
      {
@@ -145,7 +183,8 @@ int main()
             MSG_CONFIRM, (const struct sockaddr *)&servaddr,
             serversize);
 
-     cout << "Start File Transfer." << endl;
+     //cout << "Start File Transfer." << endl;
+     //struct Packet pkg;
      for (int i = 0; i < numBuffers; i++)
      {
          memset(buf, 0, bufferSize);
@@ -159,7 +198,21 @@ int main()
                  //Start file transfer
                  sendto(sockfd, start, 1, MSG_CONFIRM, (const struct sockaddr *)&servaddr, serversize);
                  
+                 cout << "Here #1\n";
+
                  bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+                 cout << "Here #2\n";
+                 struct Packet pkg = charsToPacket((char*)buf, bufferSize);
+
+                 cout << "Here #3\n";
+
+                 cout << "Packet Sequence Number: " << pkg.sn << endl;
+                 cout << "Packet CheckSum: " << pkg.crc << endl;
+                 cout << "Packet Data: " << pkg.data << endl;
+                 cout << "\n\n";
+
+                 cout << "Here #4\n";
+
                  totalBytes += bytesReceived;
                  if (bytesReceived == -1)
                  {
@@ -181,7 +234,7 @@ int main()
 
          //==============================================================================================
          output.write(buffVec.data(), sizeof(char) * 2048);
-         cout << "Writing to output file." << endl;
+         //cout << "Writing to output file." << endl;
      }
 
      int totalBytes2 = 0;
@@ -211,7 +264,7 @@ int main()
      int rec[winSize];
      char ackSent[winSize];
 
-     string pkg;
+     string tempPkg;
      resetAcks(ackSent, winSize);
 
      for (int i = 1; i <= numBuffers; i++)
@@ -222,7 +275,7 @@ int main()
          {
 
              n = recvfrom(sockfd, (char*)buf, bufferSize, MSG_WAITALL, (struct sockaddr*) & servaddr, &len);
-             pkg = buffToString(buf, bufferSize);
+             tempPkg = buffToString(buf, bufferSize);
 
              //cout << "Recieved Packet #" << (currPacket + 1) << ": " << pkg << "...\n" << endl;
              //cout << "Acknowledgement of above frames sent is received by sender\n\n";
@@ -230,7 +283,7 @@ int main()
 
              //cout << "Recieving Packet #" << (currPacket + 1) << "..." << endl;
              n = recvfrom(sockfd, (char*)buf, bufferSize, MSG_WAITALL, (struct sockaddr*) & servaddr, &len);
-             pkg = buffToString(buf, bufferSize);
+             tempPkg = buffToString(buf, bufferSize);
              //cout << "Recieved Packet #" << (currPacket + 1) << ": " << pkg << "..." << endl;
 
          }

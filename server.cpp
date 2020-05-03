@@ -50,6 +50,39 @@ void resetAcks(char* ackArray, int winSize) {
 
 }
 
+char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
+{
+
+    int c;
+    short csSize = 8;
+    short snSize = 2;
+    short headerSize = csSize + snSize;
+    short totalSize = headerSize + dataSize;
+    char* packet = new char[totalSize];
+    int totalC = 0;
+    char csString[csSize];
+    char snString[snSize];
+
+    //printf("Data: %s\n\n", data);
+
+    sprintf(csString, "%X", cs);
+    sprintf(snString, "%X", sn);
+    for (int c = 0; c < csSize; c++)
+    {
+        packet[c] = csString[c];
+    }
+    for (int c = 0; c < snSize; c++)
+    {
+        packet[c + csSize] = snString[c];
+    }
+    for (int c = headerSize; c < headerSize + dataSize; c++)
+    {
+        packet[c] = data[c - headerSize];
+        totalC++;
+    }
+    return packet;
+}
+
 int main()
 
 {
@@ -95,17 +128,13 @@ int main()
     int n, sendRe;
     socklen_t len = sizeof(cliaddr); //len is value/resuslt
 
-    
-
-
     cout << "Waiting for client start..." << endl;
-
     n = recvfrom(sockfd, (char *)buffer1, MAXLINE,
                  MSG_WAITALL, (struct sockaddr *)&cliaddr,
                  &len);
+
     buffer1[n] = '\0';
     printf("Client : %s\n\n", buffer1);
-
     string tmp = "Server Connection Established";
     length = tmp.length() + 1;
     char conAck[length];
@@ -114,16 +143,27 @@ int main()
     sendto(sockfd, (const char *)conAck, strlen(conAck),
            MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
            len);
+
     printf("Connection Ack message sent.\n");
 
-    cout << "Before Selective repeat." << endl;
+    //----------Prompt User---------------------------------------------------->>>
 
-    // ~File transfer~
-    string filename = "test.txt";
+       //~Prompt Stuff~
+       //(Protocol,Size of Packet,Timeout Interval,Size of Window,Range of Sequence Numbers,Errors)
+
+    //cout << "Input file name for transfer: ";
+    //getline(cin, filename);
+
+    //---------End Prompt User------------------------------------------------->>>
+
+    //--------~File transfer~-------------------------------------------------->>>
+
+    //char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
+    long long int checkSum = 0123456; //Check sum value for packet contents
+    unsigned short seqNum = 7; //Sequence number for the packet
 
     int bufferSize = 2056;
-    //cout << "input file name for testing: " << filename << endl;
-    // getline(cin, filename);
+    string filename = "test.txt";
 
     struct stat stat_buf;
     int rc = stat(filename.c_str(), &stat_buf);
@@ -137,33 +177,16 @@ int main()
     string numberB = to_string(numBuffers);
     string numberRem = to_string(remainingBytesInFile);
 
-    //----------Prompt User-------------------------------------------------------->>>
-
-       //~Prompt Stuff~
-
-    //------End Prompt User-------------------------------------------------------->>>
-
-
-    filename = "test.txt";
-
-    //cout << "input file name for testing: ";
-    //getline(cin, filename);
-
     rc = stat(filename.c_str(), &stat_buf);
     sizeOfFile = rc == 0 ? stat_buf.st_size : -1;
 
     numBuffers = (int)sizeOfFile / bufferSize;//numBuffers will always be an integer
     remainingBytesInFile = (int)sizeOfFile % bufferSize;
-    cout << "numBuffers: " << numBuffers << "\n";
-    cout << "remainingBytesInFile: " << remainingBytesInFile << "\n";
 
     numberB = to_string(numBuffers);
     numberRem = to_string(remainingBytesInFile);
 
-    char start[1]; 
-    start[0] = 'n';
-
-    //cout << "Here1\n";
+    //---Send necessary info to client before transfer----------------->>>
 
     sendRe = sendto(sockfd, numberB.c_str(), numberB.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
      if (sendRe == -1) { cout << "Could not send to server! Whoops!\r\n";}
@@ -171,6 +194,10 @@ int main()
      sendRe = sendto(sockfd, numberRem.c_str(), numberRem.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
      if (sendRe == -1) { cout << "Could not send to server! Whoops!\r\n"; }
 
+     //---End Send necessary info to client before transfer-------------->>>
+
+    char start[1]; 
+    start[0] = 'n';
      while (start[0] == 'n')
      {
          recvfrom(sockfd, start, 1,
@@ -182,7 +209,6 @@ int main()
 
      ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
      vector<char> buffer(bufferSize, 0);
-     //ofstream output(outputname.c_str(), std::ios::out | std::ios::binary);//used for writing out to a file
 
      char finished[1];
      finished[0] = 'y';
@@ -193,23 +219,32 @@ int main()
          fin.read(buffer.data(), buffer.size());
          result = vecToString(buffer);
 
-         //==================================get a char from the server================================== 
+         //========== Get finish Ack from Client ============================= 
 
-         //cout << "Before Finished" << endl;
          while (finished[0] == 'n')
          {
              recvfrom(sockfd, finished, 1, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
          } //wait for 'y'
 
-         //cout << "After Finished" << endl;
          finished[0] = 'n';
 
-         //==============================================================================================
+         //===================================================================
 
-         sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-                         len);
+         //cout << "==========================================>>>\n";
+         //cout << "Sending: " << result << "\n\n";
+         //cout << "==========================================>>>\n\n";
 
+         //char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
+
+         char* pkg = packetMaker(checkSum, seqNum, result.c_str(), result.size());
+
+         printf("Packet: %s\n\n", pkg);
+
+         sendRe = sendto(sockfd, pkg, sizeof(pkg), MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
+
+         //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
          if (sendRe == -1) { cout << "Could not send to server! Whoops!\r\n"; }
+
      }
 
      if (fin.good())
@@ -225,24 +260,28 @@ int main()
          }
      }
 
+     fin.close();
+
+     //--~End File transfer~----------------------------------------------------->>>
+
      //------Begin Selective Repeat-------------------------------------------------->>>
 
     //User prompt info
      int winSize = 5; //Total number a frames inside the window
      numBuffers = 20; //Number of packets that need to be sent
 
-     int seqNum = winSize * 3; //Range of sequence numbers given to the frames
+     int seqRange = winSize * 3; //Range of sequence numbers given to the frames
      int currPacket = 0; //Counter that keeps track of how many packets have been sent
      int send[winSize];
      char recAck[winSize];
 
-     string pkg;
+     string tempPkg;
      resetAcks(recAck, winSize);
 
      for (int i = 1; i <= numBuffers; i++)
      {
 
-         pkg = "Packet #" + to_string(i) + " info.";
+         tempPkg = "Packet #" + to_string(i) + " info.";
          //cout << pkg << endl;
 
          if (i % winSize == 0)
@@ -250,14 +289,14 @@ int main()
              //cout << frames[i] << "\n";
              //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
 
-             sendRe = sendto(sockfd, pkg.c_str(), pkg.size(), MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
+             sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
 
              //cout << "Acknowledgement of above frames sent is received by sender\n\n";
          }
          else {
              //cout << frames[i] << " ";
              //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
-             sendRe = sendto(sockfd, pkg.c_str(), pkg.size(), MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
+             sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
 
          }
 
@@ -266,12 +305,9 @@ int main()
 
      }
 
-     cout << "End Selective Repeat" << endl;
+     //cout << "End Selective Repeat" << endl;
 
      //------End Selective Repeat---------------------------------------------------->>>
-
-     fin.close();
-    //output.close();
 
     return 0;
 }
