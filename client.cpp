@@ -26,6 +26,9 @@
 #define PORT 9086
 #define MAXLINE 1024
 using namespace std;
+const uint32_t Polynomial = 0xEDB88320;
+uint32_t crc32_bitwise(const void *data, size_t length, uint32_t previousCrc32);
+
 string buffToString(char *buf, int bytes)
 {
     string part(buf, 0, bytes);
@@ -73,8 +76,10 @@ struct Packet charsToPacket(char *chars, int dataSize)
     short csSize = 4;
     short snSize = 2;
     struct Packet packet;
-    char *cs = substr(chars, 0, 3);
-    char *sn = substr(chars, 4, 5);
+    char *cs = substr(chars, 0, 4);
+    cout << cs << endl;
+    char *sn = substr(chars, 4, 1);
+    cout << sn << endl;
     packet.crc = stoi(cs, NULL, 16);
     packet.sn = stoi(sn, NULL, 16);
     packet.data = substr(chars, 6, dataSize - 1);
@@ -131,6 +136,7 @@ int main()
                  &len);
     buffer1[n] = '\0';
     printf("Server : %s\n", buffer1);
+    int bufferSize = stoi(buffer1, NULL, 10);
 
     //----------Prompt User-------------------------------------------------------->>>
 
@@ -139,7 +145,6 @@ int main()
     //------End Prompt User-------------------------------------------------------->>>
 
     int bytesReceived;
-    int bufferSize = 2056;
     char buf[4096];
     memset(buf, 0, 4096);
     string outputname = "outputtest.txt";
@@ -189,7 +194,12 @@ int main()
     for (int i = 0; i < numBuffers; i++)
     {
         memset(buf, 0, bufferSize);
-        bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+        bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize + 6, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+        struct Packet pkg = charsToPacket((char *)buf, bufferSize);
+        cout << "Packet Sequence Number: " << pkg.sn << endl;
+        cout << "Packet CheckSum: " << pkg.crc << endl;
+        cout << "Packet Data: " << pkg.data << endl;
+        printf("First loop%c%c%c%c%c%c%c%c%c%c%c%c\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9], buf[10], buf[11]);
         totalBytes = bytesReceived;
         if (bytesReceived < bufferSize)
         {
@@ -199,10 +209,9 @@ int main()
                 //Start file transfer
                 sendto(sockfd, start, 1, MSG_CONFIRM, (const struct sockaddr *)&servaddr, serversize);
 
-                bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-                printf("%c%c%c%c%c", buf[0], buf[1], buf[2], buf[3], buf[4]);
+                bytesReceived = recvfrom(sockfd, (char *)buf, 3000, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
                 struct Packet pkg = charsToPacket((char *)buf, bufferSize);
-
+                cout << "Second loop" << endl;
                 cout << "Packet Sequence Number: " << pkg.sn << endl;
                 cout << "Packet CheckSum: " << pkg.crc << endl;
                 cout << "Packet Data: " << pkg.data << endl;
@@ -293,4 +302,19 @@ int main()
     close(sockfd);
 
     return 0;
+}
+uint32_t crc32_bitwise(const void *data, size_t length, uint32_t previousCrc32 = 0)
+{
+    uint32_t crc = ~previousCrc32; // same as previousCrc32 ^ 0xFFFFFFFF
+    unsigned char *current = (unsigned char *)data;
+    while (length--)
+    {
+        crc ^= *current++;
+        for (unsigned int j = 0; j < 8; j++)
+            if (crc & 1)
+                crc = (crc >> 1) ^ Polynomial;
+            else
+                crc = crc >> 1;
+    }
+    return ~crc; // same as crc ^ 0xFFFFFFFF
 }

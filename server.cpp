@@ -71,7 +71,6 @@ char *packetMaker(unsigned short sn, const char *data, int dataSize)
     short headerSize = csSize + snSize;
     short totalSize = headerSize + dataSize;
     char *packet = new char[totalSize];
-    int totalC = 0;
     char csString[csSize];
     char snString[snSize];
 
@@ -81,14 +80,17 @@ char *packetMaker(unsigned short sn, const char *data, int dataSize)
     {
         packet[c] = csString[c];
     }
+    cout << endl;
+
     for (int c = 0; c < snSize; c++)
     {
         packet[c + csSize] = snString[c];
     }
+    cout << endl;
+
     for (int c = headerSize; c < headerSize + dataSize; c++)
     {
         packet[c] = data[c - headerSize];
-        totalC++;
     }
     return packet;
 }
@@ -145,10 +147,13 @@ int main()
 
     buffer1[n] = '\0';
     printf("Client : %s\n\n", buffer1);
-    string tmp = "Server Connection Established";
-    length = tmp.length() + 1;
+    //TODO TAKE USER INPUT FOR BUFFERSIZE
+    string bufferSizeString = "10";
+    int bufferSize = stoi(bufferSizeString, NULL, 10);
+
+    length = bufferSizeString.length() + 1;
     char conAck[length];
-    strcpy(conAck, tmp.c_str());
+    strcpy(conAck, bufferSizeString.c_str());
 
     sendto(sockfd, (const char *)conAck, strlen(conAck),
            MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
@@ -172,7 +177,6 @@ int main()
     long long int checkSum = 0123456; //Check sum value for packet contents
     unsigned short seqNum = 7;        //Sequence number for the packet
 
-    int bufferSize = 2056;
     string filename = "test.txt";
 
     struct stat stat_buf;
@@ -254,9 +258,12 @@ int main()
         seqNum += 1;
         char *pkg = packetMaker(seqNum, result.c_str(), result.size());
 
-        printf("Packet: %s\n\n", pkg);
+        for (int c = 0; c < result.size() + 6; c++)
+        {
+            printf("%c", pkg[c]);
+        }
 
-        sendRe = sendto(sockfd, pkg, sizeof(pkg), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+        sendRe = sendto(sockfd, pkg, (result.size() + 6), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
 
         //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
         if (sendRe == -1)
