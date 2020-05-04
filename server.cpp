@@ -27,12 +27,24 @@
 #define MAXLINE 1024
 using namespace std;
 // Driver code
-struct Packet
+
+const uint32_t Polynomial = 0xEDB88320;
+
+uint32_t crc32_bitwise(const void *data, size_t length, uint32_t previousCrc32 = 0)
 {
-    long sn;
-    long long int crc;
-    char data[128];
-};
+    uint32_t crc = ~previousCrc32; // same as previousCrc32 ^ 0xFFFFFFFF
+    unsigned char *current = (unsigned char *)data;
+    while (length--)
+    {
+        crc ^= *current++;
+        for (unsigned int j = 0; j < 8; j++)
+            if (crc & 1)
+                crc = (crc >> 1) ^ Polynomial;
+            else
+                crc = crc >> 1;
+    }
+    return ~crc; // same as crc ^ 0xFFFFFFFF
+}
 
 string vecToString(vector<char> vec)
 {
@@ -40,30 +52,28 @@ string vecToString(vector<char> vec)
     return s;
 }
 
-void resetAcks(char* ackArray, int winSize) {
+void resetAcks(char *ackArray, int winSize)
+{
 
     //char ackArray[winSize];
     for (int i = 0; i < winSize; i++)
     {
         ackArray[i] = 'n';
     }
-
 }
 
-char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
+char *packetMaker(unsigned short sn, const char *data, int dataSize)
 {
-
     int c;
-    short csSize = 8;
+    uint32_t cs = crc32_bitwise(data, dataSize);
+    short csSize = 4;
     short snSize = 2;
     short headerSize = csSize + snSize;
     short totalSize = headerSize + dataSize;
-    char* packet = new char[totalSize];
+    char *packet = new char[totalSize];
     int totalC = 0;
     char csString[csSize];
     char snString[snSize];
-
-    //printf("Data: %s\n\n", data);
 
     sprintf(csString, "%X", cs);
     sprintf(snString, "%X", sn);
@@ -148,8 +158,8 @@ int main()
 
     //----------Prompt User---------------------------------------------------->>>
 
-       //~Prompt Stuff~
-       //(Protocol,Size of Packet,Timeout Interval,Size of Window,Range of Sequence Numbers,Errors)
+    //~Prompt Stuff~
+    //(Protocol,Size of Packet,Timeout Interval,Size of Window,Range of Sequence Numbers,Errors)
 
     //cout << "Input file name for transfer: ";
     //getline(cin, filename);
@@ -160,7 +170,7 @@ int main()
 
     //char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
     long long int checkSum = 0123456; //Check sum value for packet contents
-    unsigned short seqNum = 7; //Sequence number for the packet
+    unsigned short seqNum = 7;        //Sequence number for the packet
 
     int bufferSize = 2056;
     string filename = "test.txt";
@@ -180,7 +190,7 @@ int main()
     rc = stat(filename.c_str(), &stat_buf);
     sizeOfFile = rc == 0 ? stat_buf.st_size : -1;
 
-    numBuffers = (int)sizeOfFile / bufferSize;//numBuffers will always be an integer
+    numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer
     remainingBytesInFile = (int)sizeOfFile % bufferSize;
 
     numberB = to_string(numBuffers);
@@ -189,125 +199,132 @@ int main()
     //---Send necessary info to client before transfer----------------->>>
 
     sendRe = sendto(sockfd, numberB.c_str(), numberB.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-     if (sendRe == -1) { cout << "Could not send to server! Whoops!\r\n";}
+    if (sendRe == -1)
+    {
+        cout << "Could not send to server! Whoops!\r\n";
+    }
 
-     sendRe = sendto(sockfd, numberRem.c_str(), numberRem.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-     if (sendRe == -1) { cout << "Could not send to server! Whoops!\r\n"; }
+    sendRe = sendto(sockfd, numberRem.c_str(), numberRem.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+    if (sendRe == -1)
+    {
+        cout << "Could not send to server! Whoops!\r\n";
+    }
 
-     //---End Send necessary info to client before transfer-------------->>>
+    //---End Send necessary info to client before transfer-------------->>>
 
-    char start[1]; 
+    char start[1];
     start[0] = 'n';
-     while (start[0] == 'n')
-     {
-         recvfrom(sockfd, start, 1,
-                  MSG_WAITALL, (struct sockaddr *)&cliaddr,
-                  &len);
+    while (start[0] == 'n')
+    {
+        recvfrom(sockfd, start, 1,
+                 MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                 &len);
 
-     } //wait for 'y'
-     //cout << "Start File Transfer." << "\n";
+    } //wait for 'y'
+    //cout << "Start File Transfer." << "\n";
 
-     ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
-     vector<char> buffer(bufferSize, 0);
+    ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
+    vector<char> buffer(bufferSize, 0);
 
-     char finished[1];
-     finished[0] = 'y';
-     //int numThreads = 5;
-     string result;
-     for (int i = 0; i < numBuffers; i++)
-     {
-         fin.read(buffer.data(), buffer.size());
-         result = vecToString(buffer);
+    char finished[1];
+    finished[0] = 'y';
+    //int numThreads = 5;
+    string result;
+    for (int i = 0; i < numBuffers; i++)
+    {
+        fin.read(buffer.data(), buffer.size());
+        result = vecToString(buffer);
 
-         //========== Get finish Ack from Client ============================= 
+        //========== Get finish Ack from Client =============================
 
-         while (finished[0] == 'n')
-         {
-             recvfrom(sockfd, finished, 1, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
-         } //wait for 'y'
+        while (finished[0] == 'n')
+        {
+            recvfrom(sockfd, finished, 1, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
+        } //wait for 'y'
 
-         finished[0] = 'n';
+        finished[0] = 'n';
 
-         //===================================================================
+        //===================================================================
 
-         //cout << "==========================================>>>\n";
-         //cout << "Sending: " << result << "\n\n";
-         //cout << "==========================================>>>\n\n";
+        //cout << "==========================================>>>\n";
+        //cout << "Sending: " << result << "\n\n";
+        //cout << "==========================================>>>\n\n";
 
-         //char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
+        //char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
+        seqNum += 1;
+        char *pkg = packetMaker(seqNum, result.c_str(), result.size());
 
-         char* pkg = packetMaker(checkSum, seqNum, result.c_str(), result.size());
+        printf("Packet: %s\n\n", pkg);
 
-         printf("Packet: %s\n\n", pkg);
+        sendRe = sendto(sockfd, pkg, sizeof(pkg), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
 
-         sendRe = sendto(sockfd, pkg, sizeof(pkg), MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
+        //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+        if (sendRe == -1)
+        {
+            cout << "Could not send to server! Whoops!\r\n";
+        }
+    }
 
-         //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-         if (sendRe == -1) { cout << "Could not send to server! Whoops!\r\n"; }
+    if (fin.good())
+    {
+        std::vector<char> lastBuffer(remainingBytesInFile, 0);
+        fin.read(lastBuffer.data(), remainingBytesInFile);
 
-     }
+        sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+                        len);
+        if (sendRe == -1)
+        {
+            cout << "Could not send to server! Whoops!!\r\n";
+        }
+    }
 
-     if (fin.good())
-     {
-         std::vector<char> lastBuffer(remainingBytesInFile, 0);
-         fin.read(lastBuffer.data(), remainingBytesInFile);
+    fin.close();
 
-         sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-                         len);
-         if (sendRe == -1)
-         {
-             cout << "Could not send to server! Whoops!!\r\n";
-         }
-     }
+    //--~End File transfer~----------------------------------------------------->>>
 
-     fin.close();
-
-     //--~End File transfer~----------------------------------------------------->>>
-
-     //------Begin Selective Repeat-------------------------------------------------->>>
+    //------Begin Selective Repeat-------------------------------------------------->>>
 
     //User prompt info
-     int winSize = 5; //Total number a frames inside the window
-     numBuffers = 20; //Number of packets that need to be sent
+    int winSize = 5; //Total number a frames inside the window
+    numBuffers = 20; //Number of packets that need to be sent
 
-     int seqRange = winSize * 3; //Range of sequence numbers given to the frames
-     int currPacket = 0; //Counter that keeps track of how many packets have been sent
-     int send[winSize];
-     char recAck[winSize];
+    int seqRange = winSize * 3; //Range of sequence numbers given to the frames
+    int currPacket = 0;         //Counter that keeps track of how many packets have been sent
+    int send[winSize];
+    char recAck[winSize];
 
-     string tempPkg;
-     resetAcks(recAck, winSize);
+    string tempPkg;
+    resetAcks(recAck, winSize);
 
-     for (int i = 1; i <= numBuffers; i++)
-     {
+    for (int i = 1; i <= numBuffers; i++)
+    {
 
-         tempPkg = "Packet #" + to_string(i) + " info.";
-         //cout << pkg << endl;
+        tempPkg = "Packet #" + to_string(i) + " info.";
+        //cout << pkg << endl;
 
-         if (i % winSize == 0)
-         {
-             //cout << frames[i] << "\n";
-             //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
+        if (i % winSize == 0)
+        {
+            //cout << frames[i] << "\n";
+            //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
 
-             sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
+            sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
 
-             //cout << "Acknowledgement of above frames sent is received by sender\n\n";
-         }
-         else {
-             //cout << frames[i] << " ";
-             //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
-             sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
+            //cout << "Acknowledgement of above frames sent is received by sender\n\n";
+        }
+        else
+        {
+            //cout << frames[i] << " ";
+            //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
+            sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+        }
 
-         }
+        //cout << "Current Ack: " << recAck[i % winSize] << endl;
+        currPacket++;
+    }
 
-         //cout << "Current Ack: " << recAck[i % winSize] << endl;
-         currPacket++;
+    //cout << "End Selective Repeat" << endl;
 
-     }
-
-     //cout << "End Selective Repeat" << endl;
-
-     //------End Selective Repeat---------------------------------------------------->>>
+    //------End Selective Repeat---------------------------------------------------->>>
 
     return 0;
 }

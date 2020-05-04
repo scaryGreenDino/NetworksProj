@@ -41,19 +41,19 @@ vector<char> charToVec(char *str, int length)
     return result;
 }
 
-void resetAcks(char* ackArray, int winSize) {
+void resetAcks(char *ackArray, int winSize)
+{
 
     //char ackArray[winSize];
     for (int i = 0; i < winSize; i++)
     {
         ackArray[i] = 'n';
     }
-
 }
 
-char* substr(char* arr, int begin, int len)
+char *substr(char *arr, int begin, int len)
 {
-    char* res = new char[len];
+    char *res = new char[len];
     for (int i = 0; i < len; i++)
         res[i] = *(arr + begin + i);
     res[len] = 0;
@@ -63,24 +63,26 @@ char* substr(char* arr, int begin, int len)
 struct Packet
 {
     short sn;
-    long long int crc;
-    char* data;
+    uint32_t crc;
+    char *data;
 };
 
-struct Packet charsToPacket(char* chars, int dataSize)
+struct Packet charsToPacket(char *chars, int dataSize)
 {
     int c;
-    short csSize = 8;
+    short csSize = 4;
     short snSize = 2;
     struct Packet packet;
-    char* cs = substr(chars, 0, 7);
-    char* sn = substr(chars, 8, 9);
-
-    cout << "Sequence Number: " << sn << endl;
-
-    packet.crc = strtoll(cs, NULL, 16);
+    char *cs = substr(chars, 0, 3);
+    char *sn = substr(chars, 4, 5);
+    packet.crc = stoi(cs, NULL, 16);
     packet.sn = stoi(sn, NULL, 16);
-    packet.data = substr(chars, 10, dataSize - 1);
+    packet.data = substr(chars, 6, dataSize - 1);
+    cout << "PACKET " << endl;
+    cout << "SEQUENCE NUM: " << packet.sn << endl;
+    cout << "CRC:          " << packet.crc << endl;
+    cout << "DATA:         " << packet.data << endl;
+
     return packet;
 }
 
@@ -132,10 +134,9 @@ int main()
 
     //----------Prompt User-------------------------------------------------------->>>
 
-        //~Prompt Stuff~
+    //~Prompt Stuff~
 
     //------End Prompt User-------------------------------------------------------->>>
-
 
     int bytesReceived;
     int bufferSize = 2056;
@@ -145,110 +146,103 @@ int main()
 
     //---Recieve necessary info from Server before transfer----------------->>>
 
-     memset(buf, 0, bufferSize);
-     bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-     printf("Contents of Buf #1: %s\n", buf); // This recieve gets numBuffers
-     int numBuffers = atoi(buf);
+    memset(buf, 0, bufferSize);
+    bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+    printf("Contents of Buf #1: %s\n", buf); // This recieve gets numBuffers
+    int numBuffers = atoi(buf);
 
-     if (bytesReceived == -1)
-     {
-         cerr << "	Error in recvfrom(). Quitting" << endl;
-         return -1;
-     }
+    if (bytesReceived == -1)
+    {
+        cerr << "	Error in recvfrom(). Quitting" << endl;
+        return -1;
+    }
 
-     memset(buf, 0, bufferSize);
-     bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-     printf("Contents of Buf #2: %s\n", buf); //This recieve gets remainingBytes
-     int remainingBytes = atoi(buf); //deccryption doubles size of message
+    memset(buf, 0, bufferSize);
+    bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+    printf("Contents of Buf #2: %s\n", buf); //This recieve gets remainingBytes
+    int remainingBytes = atoi(buf);          //deccryption doubles size of message
 
-     //---End Recieve----------------------------------------------------->>>
+    //---End Recieve----------------------------------------------------->>>
 
+    if (remainingBytes % 8 != 0)
+    {
+        remainingBytes = (8 - remainingBytes % 8) + remainingBytes;
+    }
 
-     if (remainingBytes % 8 != 0)
-     {
-         remainingBytes = (8 - remainingBytes % 8) + remainingBytes;
-     }
+    ofstream output(outputname.c_str(), std::ios::out | std::ios::binary); //used for writing out to a file
 
-     ofstream output(outputname.c_str(), std::ios::out | std::ios::binary); //used for writing out to a file
+    char start[1];
+    start[0] = 'y';
+    char finished[1];
+    finished[0] = 'y';
 
-     char start[1];
-     start[0] = 'y';
-     char finished[1];
-     finished[0] = 'y';
+    int totalBytes;
+    int lengthOfString;
 
-     int totalBytes;
-     int lengthOfString;
+    sendto(sockfd, start, 1,
+           MSG_CONFIRM, (const struct sockaddr *)&servaddr,
+           serversize);
 
-     sendto(sockfd, start, 1,
-            MSG_CONFIRM, (const struct sockaddr *)&servaddr,
-            serversize);
+    //cout << "Start File Transfer." << endl;
+    //struct Packet pkg;
+    cout << "Number of Buffers:" << numBuffers << endl;
+    for (int i = 0; i < numBuffers; i++)
+    {
+        memset(buf, 0, bufferSize);
+        bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+        totalBytes = bytesReceived;
+        if (bytesReceived < bufferSize)
+        {
+            while (totalBytes != bufferSize)
+            {
 
-     //cout << "Start File Transfer." << endl;
-     //struct Packet pkg;
-     for (int i = 0; i < numBuffers; i++)
-     {
-         memset(buf, 0, bufferSize);
-         bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-         totalBytes = bytesReceived;
-         if (bytesReceived < bufferSize)
-         {
-             while (totalBytes != bufferSize)
-             {
+                //Start file transfer
+                sendto(sockfd, start, 1, MSG_CONFIRM, (const struct sockaddr *)&servaddr, serversize);
 
-                 //Start file transfer
-                 sendto(sockfd, start, 1, MSG_CONFIRM, (const struct sockaddr *)&servaddr, serversize);
-                 
-                 cout << "Here #1\n";
+                bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+                printf("%c%c%c%c%c", buf[0], buf[1], buf[2], buf[3], buf[4]);
+                struct Packet pkg = charsToPacket((char *)buf, bufferSize);
 
-                 bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-                 cout << "Here #2\n";
-                 struct Packet pkg = charsToPacket((char*)buf, bufferSize);
+                cout << "Packet Sequence Number: " << pkg.sn << endl;
+                cout << "Packet CheckSum: " << pkg.crc << endl;
+                cout << "Packet Data: " << pkg.data << endl;
+                cout << "\n\n";
 
-                 cout << "Here #3\n";
+                totalBytes += bytesReceived;
+                if (bytesReceived == -1)
+                {
+                    cerr << "	Error in recvfrom(). Quitting!" << endl;
+                    return -1;
+                }
+            }
 
-                 cout << "Packet Sequence Number: " << pkg.sn << endl;
-                 cout << "Packet CheckSum: " << pkg.crc << endl;
-                 cout << "Packet Data: " << pkg.data << endl;
-                 cout << "\n\n";
+            totalBytes = 0;
+        }
 
-                 cout << "Here #4\n";
+        vector<char> buffVec = charToVec(buf, bytesReceived);
+        cout << "Recieve chunk: " << i << "\n";
+        //==================================send a char back to server==================================
 
-                 totalBytes += bytesReceived;
-                 if (bytesReceived == -1)
-                 {
-                     cerr << "	Error in recvfrom(). Quitting!" << endl;
-                     return -1;
-                 }
-             }
+        sendto(sockfd, finished, 1,
+               MSG_CONFIRM, (const struct sockaddr *)&servaddr,
+               serversize);
 
-             totalBytes = 0;
-         }
+        //==============================================================================================
+        output.write(buffVec.data(), sizeof(char) * 2048);
+        //cout << "Writing to output file." << endl;
+    }
 
-         vector<char> buffVec = charToVec(buf, bytesReceived);
-         cout << "Recieve chunk: " << i << "\n";
-         //==================================send a char back to server==================================
+    int totalBytes2 = 0;
+    if (remainingBytes != 0)
+    {
+        memset(buf, 0, bufferSize);
+        bytesReceived = recvfrom(sockfd, buf, remainingBytes, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+        totalBytes2 = bytesReceived;
 
-         sendto(sockfd, finished, 1,
-             MSG_CONFIRM, (const struct sockaddr*)& servaddr,
-             serversize);
-
-         //==============================================================================================
-         output.write(buffVec.data(), sizeof(char) * 2048);
-         //cout << "Writing to output file." << endl;
-     }
-
-     int totalBytes2 = 0;
-     if (remainingBytes != 0)
-     {
-         memset(buf, 0, bufferSize);
-         bytesReceived = recvfrom(sockfd, buf, remainingBytes, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-         totalBytes2 = bytesReceived;
-         
-         cout << "Writing to last chunk to output file" << endl;
-         vector<char> buffVec = charToVec(buf, bytesReceived);
-         output.write(buffVec.data(), sizeof(char) * 16);
-
-     }
+        cout << "Writing to last chunk to output file" << endl;
+        vector<char> buffVec = charToVec(buf, bytesReceived);
+        output.write(buffVec.data(), sizeof(char) * 16);
+    }
 
     //read in chunk one by one
     //put each chunk into file, waiting for previous chunk to be insertd into file
@@ -256,46 +250,45 @@ int main()
     //------Begin Selective Repeat-------------------------------------------------->>>
 
     //Recieved from server
-     int winSize = 5; //Total number a frames inside the window
-     numBuffers = 20; //Number of packets that need to be sent
+    int winSize = 5; //Total number a frames inside the window
+    numBuffers = 20; //Number of packets that need to be sent
 
-     int seqNum = winSize * 3; //Range of sequence numbers given to the frames
-     int currPacket = 0; //Counter that keeps track of how many packets have been sent
-     int rec[winSize];
-     char ackSent[winSize];
+    int seqNum = winSize * 3; //Range of sequence numbers given to the frames
+    int currPacket = 0;       //Counter that keeps track of how many packets have been sent
+    int rec[winSize];
+    char ackSent[winSize];
 
-     string tempPkg;
-     resetAcks(ackSent, winSize);
+    string tempPkg;
+    resetAcks(ackSent, winSize);
 
-     for (int i = 1; i <= numBuffers; i++)
-     {
+    for (int i = 1; i <= numBuffers; i++)
+    {
 
-         memset(buf, 0, 4096);
-         if (i % winSize == 0)
-         {
+        memset(buf, 0, 4096);
+        if (i % winSize == 0)
+        {
 
-             n = recvfrom(sockfd, (char*)buf, bufferSize, MSG_WAITALL, (struct sockaddr*) & servaddr, &len);
-             tempPkg = buffToString(buf, bufferSize);
+            n = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+            tempPkg = buffToString(buf, bufferSize);
 
-             //cout << "Recieved Packet #" << (currPacket + 1) << ": " << pkg << "...\n" << endl;
-             //cout << "Acknowledgement of above frames sent is received by sender\n\n";
-         } else {
+            //cout << "Recieved Packet #" << (currPacket + 1) << ": " << pkg << "...\n" << endl;
+            //cout << "Acknowledgement of above frames sent is received by sender\n\n";
+        }
+        else
+        {
 
-             //cout << "Recieving Packet #" << (currPacket + 1) << "..." << endl;
-             n = recvfrom(sockfd, (char*)buf, bufferSize, MSG_WAITALL, (struct sockaddr*) & servaddr, &len);
-             tempPkg = buffToString(buf, bufferSize);
-             //cout << "Recieved Packet #" << (currPacket + 1) << ": " << pkg << "..." << endl;
+            //cout << "Recieving Packet #" << (currPacket + 1) << "..." << endl;
+            n = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+            tempPkg = buffToString(buf, bufferSize);
+            //cout << "Recieved Packet #" << (currPacket + 1) << ": " << pkg << "..." << endl;
+        }
 
-         }
+        //cout << "Current Ack: " << recAck[i % winSize] << endl;
+        currPacket++;
+    }
 
-         //cout << "Current Ack: " << recAck[i % winSize] << endl;
-         currPacket++;
+    //------End Selective Repeat---------------------------------------------------->>>
 
-     }
-
-
-     //------End Selective Repeat---------------------------------------------------->>>
-    
     output.close();
     close(sockfd);
 
