@@ -80,13 +80,11 @@ char *packetMaker(unsigned short sn, const char *data, int dataSize)
     {
         packet[c] = csString[c];
     }
-    cout << endl;
 
     for (int c = 0; c < snSize; c++)
     {
         packet[c + csSize] = snString[c];
     }
-    cout << endl;
 
     for (int c = headerSize; c < headerSize + dataSize; c++)
     {
@@ -148,8 +146,10 @@ int main()
     buffer1[n] = '\0';
     printf("Client : %s\n\n", buffer1);
     //TODO TAKE USER INPUT FOR BUFFERSIZE
-    string bufferSizeString = "10";
+    int header = 6;
+    string bufferSizeString = "2056";
     int bufferSize = stoi(bufferSizeString, NULL, 10);
+    int dataSize = bufferSize - header;
 
     length = bufferSizeString.length() + 1;
     char conAck[length];
@@ -183,7 +183,8 @@ int main()
     int rc = stat(filename.c_str(), &stat_buf);
     int sizeOfFile = rc == 0 ? stat_buf.st_size : -1;
 
-    int numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer
+    int numBuffers = (int)sizeOfFile / dataSize; //numBuffers will always be an integer
+    //int numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer (OG)
     int remainingBytesInFile = (int)sizeOfFile % bufferSize;
     //cout << "NumBuffers: " << numBuffers << "\n";
     //cout << "RemainingBytesInFile: " << remainingBytesInFile << "\n";
@@ -194,11 +195,12 @@ int main()
     rc = stat(filename.c_str(), &stat_buf);
     sizeOfFile = rc == 0 ? stat_buf.st_size : -1;
 
-    numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer
-    remainingBytesInFile = (int)sizeOfFile % bufferSize;
+    //numBuffers = (int)sizeOfFile / dataSize; //numBuffers will always be an integer
+    //numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer (OG)
+    //remainingBytesInFile = (int)sizeOfFile % bufferSize;
 
-    numberB = to_string(numBuffers);
-    numberRem = to_string(remainingBytesInFile);
+    //numberB = to_string(numBuffers);
+    //numberRem = to_string(remainingBytesInFile);
 
     //---Send necessary info to client before transfer----------------->>>
 
@@ -228,7 +230,8 @@ int main()
     //cout << "Start File Transfer." << "\n";
 
     ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
-    vector<char> buffer(bufferSize, 0);
+    vector<char> buffer(dataSize, 0);
+    //vector<char> buffer(bufferSize, 0);
 
     char finished[1];
     finished[0] = 'y';
@@ -258,12 +261,12 @@ int main()
         seqNum += 1;
         char *pkg = packetMaker(seqNum, result.c_str(), result.size());
 
-        for (int c = 0; c < result.size() + 6; c++)
+        /*for (int c = 0; c < result.size() + 6; c++)
         {
             printf("%c", pkg[c]);
-        }
+        }*/
 
-        sendRe = sendto(sockfd, pkg, (result.size() + 6), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+        sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
 
         //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
         if (sendRe == -1)
@@ -272,13 +275,22 @@ int main()
         }
     }
 
+    string lastBuffString;
     if (fin.good())
     {
         std::vector<char> lastBuffer(remainingBytesInFile, 0);
         fin.read(lastBuffer.data(), remainingBytesInFile);
+        lastBuffString = vecToString(lastBuffer);
+        //cout << "Last Buffer: " << lastBuffString << endl;
 
-        sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-                        len);
+        char* pkg = packetMaker(seqNum, lastBuffString.c_str(), lastBuffString.size());
+        sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr*) & cliaddr,
+                           len);
+
+        //printf("Last buffer: %s\n", pkg);
+
+        //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+         //               len);
         if (sendRe == -1)
         {
             cout << "Could not send to server! Whoops!!\r\n";
@@ -292,7 +304,7 @@ int main()
     //------Begin Selective Repeat-------------------------------------------------->>>
 
     //User prompt info
-    int winSize = 5; //Total number a frames inside the window
+    /* int winSize = 5; //Total number a frames inside the window
     numBuffers = 20; //Number of packets that need to be sent
 
     int seqRange = winSize * 3; //Range of sequence numbers given to the frames
@@ -327,7 +339,7 @@ int main()
 
         //cout << "Current Ack: " << recAck[i % winSize] << endl;
         currPacket++;
-    }
+    } */
 
     //cout << "End Selective Repeat" << endl;
 

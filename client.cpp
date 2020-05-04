@@ -77,17 +77,18 @@ struct Packet charsToPacket(char *chars, int dataSize)
     short snSize = 2;
     struct Packet packet;
     char *cs = substr(chars, 0, 4);
-    cout << cs << endl;
+    //cout << cs << endl;
     char *sn = substr(chars, 4, 1);
-    cout << sn << endl;
+    //cout << sn << endl;
     packet.crc = stoi(cs, NULL, 16);
     packet.sn = stoi(sn, NULL, 16);
     packet.data = substr(chars, 6, dataSize - 1);
-    cout << "PACKET " << endl;
-    cout << "SEQUENCE NUM: " << packet.sn << endl;
-    cout << "CRC:          " << packet.crc << endl;
-    cout << "DATA:         " << packet.data << endl;
 
+   // cout << "PACKET " << endl;
+   // cout << "   SEQUENCE NUM: " << packet.sn << endl;
+   // cout << "   CRC:          " << packet.crc << endl;
+    //cout << "   DATA:         " << packet.data << endl;
+        
     return packet;
 }
 
@@ -138,12 +139,6 @@ int main()
     printf("Server : %s\n", buffer1);
     int bufferSize = stoi(buffer1, NULL, 10);
 
-    //----------Prompt User-------------------------------------------------------->>>
-
-    //~Prompt Stuff~
-
-    //------End Prompt User-------------------------------------------------------->>>
-
     int bytesReceived;
     char buf[4096];
     memset(buf, 0, 4096);
@@ -153,7 +148,7 @@ int main()
 
     memset(buf, 0, bufferSize);
     bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-    printf("Contents of Buf #1: %s\n", buf); // This recieve gets numBuffers
+    //printf("Contents of Buf #1: %s\n", buf); // This recieve gets numBuffers
     int numBuffers = atoi(buf);
 
     if (bytesReceived == -1)
@@ -164,7 +159,7 @@ int main()
 
     memset(buf, 0, bufferSize);
     bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
-    printf("Contents of Buf #2: %s\n", buf); //This recieve gets remainingBytes
+    //printf("Contents of Buf #2: %s\n", buf); //This recieve gets remainingBytes
     int remainingBytes = atoi(buf);          //deccryption doubles size of message
 
     //---End Recieve----------------------------------------------------->>>
@@ -190,16 +185,22 @@ int main()
 
     //cout << "Start File Transfer." << endl;
     //struct Packet pkg;
-    cout << "Number of Buffers:" << numBuffers << endl;
+    //cout << "Number of Buffers:" << numBuffers << endl;
     for (int i = 0; i < numBuffers; i++)
     {
         memset(buf, 0, bufferSize);
         bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize + 6, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
         struct Packet pkg = charsToPacket((char *)buf, bufferSize);
-        cout << "Packet Sequence Number: " << pkg.sn << endl;
-        cout << "Packet CheckSum: " << pkg.crc << endl;
-        cout << "Packet Data: " << pkg.data << endl;
-        printf("First loop%c%c%c%c%c%c%c%c%c%c%c%c\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9], buf[10], buf[11]);
+
+        cout << "=== Start Chunk =====================================================================>>>\n\n";
+        cout << "First loop" << endl;
+        cout << "   Packet Sequence Number: " << pkg.sn << endl;
+        cout << "   Packet CheckSum: " << pkg.crc << endl;
+        cout << "\nPacket Data:\n\n" << pkg.data << endl;
+        cout << endl;
+        cout << "=== End Chunk =====================================================================>>>\n\n";
+
+        //printf("First loop%c%c%c%c%c%c%c%c%c%c%c%c\n", buf[0], buf[1], buf[2], buf[3], buf[4], buf[5], buf[6], buf[7], buf[8], buf[9], buf[10], buf[11]);
         totalBytes = bytesReceived;
         if (bytesReceived < bufferSize)
         {
@@ -211,11 +212,14 @@ int main()
 
                 bytesReceived = recvfrom(sockfd, (char *)buf, 3000, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
                 struct Packet pkg = charsToPacket((char *)buf, bufferSize);
+
+                cout << "=== Start Chunk =====================================================================>>>\n\n";
                 cout << "Second loop" << endl;
-                cout << "Packet Sequence Number: " << pkg.sn << endl;
-                cout << "Packet CheckSum: " << pkg.crc << endl;
-                cout << "Packet Data: " << pkg.data << endl;
-                cout << "\n\n";
+                cout << "   Packet Sequence Number: " << pkg.sn << endl;
+                cout << "   Packet CheckSum: " << pkg.crc << endl;
+                cout << "\nPacket Data:\n\n" << pkg.data << endl;
+                cout << endl;
+                cout << "=== End Chunk =====================================================================>>>\n\n";
 
                 totalBytes += bytesReceived;
                 if (bytesReceived == -1)
@@ -229,7 +233,7 @@ int main()
         }
 
         vector<char> buffVec = charToVec(buf, bytesReceived);
-        cout << "Recieve chunk: " << i << "\n";
+        cout << "Recieved chunk: " << i << "\n\n";
         //==================================send a char back to server==================================
 
         sendto(sockfd, finished, 1,
@@ -246,7 +250,16 @@ int main()
     {
         memset(buf, 0, bufferSize);
         bytesReceived = recvfrom(sockfd, buf, remainingBytes, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
+
         totalBytes2 = bytesReceived;
+        struct Packet pkg = charsToPacket((char*)buf, remainingBytes);
+        cout << "=== Start Chunk =====================================================================>>>\n\n";
+        cout << "Last If" << endl;
+        cout << "   Packet Sequence Number: " << pkg.sn << endl;
+        cout << "   Packet CheckSum: " << pkg.crc << endl;
+        cout << "\nPacket Data:\n\n" << pkg.data << endl;
+        cout << endl;
+        cout << "=== End Chunk =====================================================================>>>\n\n";
 
         cout << "Writing to last chunk to output file" << endl;
         vector<char> buffVec = charToVec(buf, bytesReceived);
@@ -259,7 +272,7 @@ int main()
     //------Begin Selective Repeat-------------------------------------------------->>>
 
     //Recieved from server
-    int winSize = 5; //Total number a frames inside the window
+    /*int winSize = 5; //Total number a frames inside the window
     numBuffers = 20; //Number of packets that need to be sent
 
     int seqNum = winSize * 3; //Range of sequence numbers given to the frames
@@ -294,7 +307,7 @@ int main()
 
         //cout << "Current Ack: " << recAck[i % winSize] << endl;
         currPacket++;
-    }
+    } */
 
     //------End Selective Repeat---------------------------------------------------->>>
 
