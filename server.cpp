@@ -23,7 +23,7 @@
 #include <netinet/in.h>
 #include "checksum.h"
 
-#define PORT 9086
+#define PORT 9088
 #define MAXLINE 1024
 using namespace std;
 // Driver code
@@ -58,7 +58,6 @@ string vecToString(vector<char> vec)
 void initArr(char *ackArray, int* arr, int winSize)
 {
 
-    //cout << "Size of ackArray: " << sizeof(ackArray) << endl;
     for (int i = 0; i < winSize; i++)
     {
         ackArray[i] = 'n';
@@ -97,6 +96,14 @@ void printIntArr(int* arr, int winSize) {
     }
 }
 
+void isReceived(char* window, int* arr, int seqNum, int winSize) {
+    for (int j = 0; j < winSize; j++) {
+        if (arr[j] == seqNum) {
+            window[j] = 'y';
+        }
+    }
+}
+
 int slide(char *window, int* arr, int base, int winSize)
 {
     char tmpC[winSize];
@@ -122,9 +129,6 @@ int slide(char *window, int* arr, int base, int winSize)
             if (base >= (winSize * 3)) { //Resets the first entry back to zero
                 base = 0;
             }
-
-            //cout << "Ack Arr[" << j << "]: " << tmpC[j] << endl;
-            //cout << "Send Arr[" << j << "]: " << tmpI[j] << endl;
         }
 
         strcpy(window, tmpC);
@@ -180,48 +184,29 @@ void selectiveRepeatSend(vector<char> buffer, ifstream &fin, int remainingBytesI
     char* pktStore[numBuffers]; //Stores each packet for reference if any get lost
 
     initArr(recAck, send, winSize);
-
-    /*//printCharArr(recAck, winSize);
-    recAck[0] = 'y';
-    //recAck[1] = 'y';
-    recAck[2] = 'y';
-    recAck[3] = 'y';
+    printIntArr(send, winSize);
     //printCharArr(recAck, winSize);
 
-    //recAck[4] = 'y';
-    printCharArr(recAck, winSize);
-    printIntArr(send, winSize);
-
-    base = slide(recAck, send, base, winSize);
-    printCharArr(recAck, winSize);
-    printIntArr(send, winSize);*/
-
-    char finished[1];
-    finished[0] = 'y';
+    char buf[5];
+    int recSN;
+    string::size_type sz;
     string result;
     for (int i = 0; i < numBuffers; i++)
     {
+        memset(buf, 0, sizeof(buf));
         fin.read(buffer.data(), buffer.size());
         result = vecToString(buffer);
-
-        //========== Get finish Ack from Client =============================
-
-        while (finished[0] == 'n')
-        {
-            recvfrom(sockfd, finished, 1, MSG_WAITALL, (struct sockaddr*) & cliaddr, &len);
-            //cout << "Ack " << seqNum << " recieved.\n";
-
-        } //wait for 'y'
-
-        finished[0] = 'n';
-
-        //===================================================================
 
         cout << "Packet " << seqNum << " sent.\n";
         char* pkg = packetMaker(seqNum, result.c_str(), result.size());
         pktStore[seqNum - 1] = pkg;
         sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
-        //printf("Packet Storage Array: %s\n", pktStore[seqNum - 1]);
+        if (sendRe == -1)
+        {
+            cout << "Could not send to server! Whoops!\r\n";
+        }
+
+
         if (seqNum >= seqRange) {
             seqNum = 0;
         }
@@ -229,12 +214,14 @@ void selectiveRepeatSend(vector<char> buffer, ifstream &fin, int remainingBytesI
             seqNum++;
         }
         
-
-        //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-        if (sendRe == -1)
-        {
-            cout << "Could not send to server! Whoops!\r\n";
-        }
+        recvfrom(sockfd, (char*)buf, sizeof(buf), MSG_WAITALL, (struct sockaddr*) & cliaddr, &len);
+        recSN = stoi(buf, &sz);
+        cout << "Ack " << recSN << " received.\n";
+        isReceived(recAck, send, recSN, winSize);
+        base = slide(recAck, send, base, winSize);
+        printIntArr(send, winSize);
+        //printCharArr(recAck, winSize);
+        
     }
 
     string lastBuffString;
@@ -246,15 +233,24 @@ void selectiveRepeatSend(vector<char> buffer, ifstream &fin, int remainingBytesI
 
         char* pkg = packetMaker(seqNum, lastBuffString.c_str(), lastBuffString.size());
         pktStore[seqNum - 1] = pkg;
-        //printf("Packet Storage Array: %s\n", pktStore[seqNum - 1]);
         sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr*) & cliaddr,
             len);
         seqNum++;
+
+        recvfrom(sockfd, (char*)buf, sizeof(buf), MSG_WAITALL, (struct sockaddr*) & cliaddr, &len);
+        recSN = stoi(buf, &sz);
+
+        cout << "Ack " << recSN << " received.\n";
+        isReceived(recAck, send, recSN, winSize);
+        base = slide(recAck, send, base, winSize);
+        printIntArr(send, winSize);
+        //printCharArr(recAck, winSize);
 
         if (sendRe == -1)
         {
             cout << "Could not send to server! Whoops!!\r\n";
         }
+
     }
 }
 
@@ -391,100 +387,8 @@ int main()
 
     selectiveRepeatSend(buffer, fin, remainingBytesInFile, numBuffers, bufferSize);
 
-    /* char finished[1];
-    finished[0] = 'y';
-    string result;
-    for (int i = 0; i < numBuffers; i++)
-    {
-        fin.read(buffer.data(), buffer.size());
-        result = vecToString(buffer);
-
-        //========== Get finish Ack from Client =============================
-
-        while (finished[0] == 'n')
-        {
-            recvfrom(sockfd, finished, 1, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
-        } //wait for 'y'
-
-        finished[0] = 'n';
-
-        //===================================================================
-
-        seqNum++;
-        char *pkg = packetMaker(seqNum, result.c_str(), result.size());
-        sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-
-        //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-        if (sendRe == -1)
-        {
-            cout << "Could not send to server! Whoops!\r\n";
-        }
-    }
-
-    string lastBuffString;
-    if (fin.good())
-    {
-        std::vector<char> lastBuffer(remainingBytesInFile, 0);
-        fin.read(lastBuffer.data(), remainingBytesInFile);
-        lastBuffString = vecToString(lastBuffer);
-
-        char* pkg = packetMaker(seqNum, lastBuffString.c_str(), lastBuffString.size());
-        sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr*) & cliaddr,
-                           len);
-
-        if (sendRe == -1)
-        {
-            cout << "Could not send to server! Whoops!!\r\n";
-        }
-    } */
-
     fin.close();
-
     //--~End File transfer~----------------------------------------------------->>>
-
-    //------Begin Selective Repeat-------------------------------------------------->>>
-
-    //User prompt info
-    /* int winSize = 5; //Total number a frames inside the window
-    numBuffers = 20; //Number of packets that need to be sent
-
-    int seqRange = winSize * 3; //Range of sequence numbers given to the frames
-    int currPacket = 0;         //Counter that keeps track of how many packets have been sent
-    int send[winSize];
-    char recAck[winSize];
-
-    string tempPkg;
-    resetAcks(recAck, winSize);
-
-    for (int i = 1; i <= numBuffers; i++)
-    {
-
-        tempPkg = "Packet #" + to_string(i) + " info.";
-        //cout << pkg << endl;
-
-        if (i % winSize == 0)
-        {
-            //cout << frames[i] << "\n";
-            //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
-
-            sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-
-            //cout << "Acknowledgement of above frames sent is received by sender\n\n";
-        }
-        else
-        {
-            //cout << frames[i] << " ";
-            //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
-            sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-        }
-
-        //cout << "Current Ack: " << recAck[i % winSize] << endl;
-        currPacket++;
-    } */
-
-    //cout << "End Selective Repeat" << endl;
-
-    //------End Selective Repeat---------------------------------------------------->>>
 
     return 0;
 }
