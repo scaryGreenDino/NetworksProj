@@ -316,6 +316,7 @@ int main()
 
     return 0;
 }
+
 uint32_t crc32_bitwise(const void *data, size_t length, uint32_t previousCrc32 = 0)
 {
     uint32_t crc = ~previousCrc32; // same as previousCrc32 ^ 0xFFFFFFFF

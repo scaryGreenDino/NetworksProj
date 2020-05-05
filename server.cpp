@@ -29,6 +29,9 @@ using namespace std;
 // Driver code
 
 const uint32_t Polynomial = 0xEDB88320;
+int sockfd, sendRe;
+struct sockaddr_in servaddr, cliaddr;
+socklen_t len;
 
 uint32_t crc32_bitwise(const void *data, size_t length, uint32_t previousCrc32 = 0)
 {
@@ -55,12 +58,45 @@ string vecToString(vector<char> vec)
 void resetAcks(char *ackArray, int winSize)
 {
 
-    //char ackArray[winSize];
+    //cout << "Size of ackArray: " << sizeof(ackArray) << endl;
     for (int i = 0; i < winSize; i++)
     {
         ackArray[i] = 'n';
     }
 }
+
+void printArr(char *arr, int winSize) {
+
+    //cout << "Size of Arr: " << sizeof(arr) << endl;
+    cout << "Array: ";
+    for (int i = 0; i < winSize; i++)
+    {
+        cout << arr[i] << " ";
+    }
+
+    cout << endl;
+} 
+
+void slide(char *window, int winSize)
+{
+    char tmp[winSize];
+    //cout << "Size of window: " << sizeof(tmp) << endl;
+    for (int i = 0; i < winSize; i++)
+    {
+        if (i < (winSize-1)) {
+            tmp[i] = window[i + 1];
+            //cout << tmp[i] << " ";
+        }
+        else {
+            tmp[i] = 'n';
+            //cout << tmp[i] << endl;
+        }
+    }
+
+    strcpy(window, tmp);
+}
+
+
 
 char *packetMaker(unsigned short sn, const char *data, int dataSize)
 {
@@ -76,6 +112,9 @@ char *packetMaker(unsigned short sn, const char *data, int dataSize)
 
     sprintf(csString, "%X", cs);
     sprintf(snString, "%X", sn);
+
+    //printf("Header: %s%s\n", csString, snString);
+
     for (int c = 0; c < csSize; c++)
     {
         packet[c] = csString[c];
@@ -93,6 +132,89 @@ char *packetMaker(unsigned short sn, const char *data, int dataSize)
     return packet;
 }
 
+void selectiveRepeatSend(vector<char> buffer, ifstream &fin, int remainingBytesInFile, int numBuffers, int bufferSize) {
+
+    int seqNum = 1;
+    int winSize = 5; //Total number a frames inside the window
+    int seqRange = winSize * 3; //Range of sequence numbers given to the frames
+    int currPacket = 0;         //Counter that keeps track of how many packets have been sent
+    int send[winSize];
+    char recAck[winSize];
+    char* pktStore[numBuffers]; //Stores each packet for reference if any get lost
+
+    //cout << "Size of recAck: " << sizeof(recAck) << endl;
+    resetAcks(recAck, winSize);
+    //cout << "Size of recAck(After Reset): " << sizeof(recAck) << endl;
+
+  /*  printArr(recAck, winSize);
+    recAck[0] = 'y';
+    recAck[1] = 'y';
+    recAck[2] = 'y';
+    printArr(recAck, winSize);
+
+    recAck[3] = 'y';
+    recAck[4] = 'y';
+    printArr(recAck, winSize);
+    slide(recAck, winSize);
+    printArr(recAck, winSize);
+    slide(recAck, winSize);
+    slide(recAck, winSize);
+    printArr(recAck, winSize);*/
+
+
+    char finished[1];
+    finished[0] = 'y';
+    string result;
+    for (int i = 0; i < numBuffers; i++)
+    {
+        fin.read(buffer.data(), buffer.size());
+        result = vecToString(buffer);
+
+        //========== Get finish Ack from Client =============================
+
+        while (finished[0] == 'n')
+        {
+            recvfrom(sockfd, finished, 1, MSG_WAITALL, (struct sockaddr*) & cliaddr, &len);
+        } //wait for 'y'
+
+        finished[0] = 'n';
+
+        //===================================================================
+
+        char* pkg = packetMaker(seqNum, result.c_str(), result.size());
+        pktStore[seqNum - 1] = pkg;
+        sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
+        //printf("Packet Storage Array: %s\n", pktStore[seqNum - 1]);
+        seqNum++;
+
+        //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+        if (sendRe == -1)
+        {
+            cout << "Could not send to server! Whoops!\r\n";
+        }
+    }
+
+    string lastBuffString;
+    if (fin.good())
+    {
+        std::vector<char> lastBuffer(remainingBytesInFile, 0);
+        fin.read(lastBuffer.data(), remainingBytesInFile);
+        lastBuffString = vecToString(lastBuffer);
+
+        char* pkg = packetMaker(seqNum, lastBuffString.c_str(), lastBuffString.size());
+        pktStore[seqNum - 1] = pkg;
+        //printf("Packet Storage Array: %s\n", pktStore[seqNum - 1]);
+        sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr*) & cliaddr,
+            len);
+        seqNum++;
+
+        if (sendRe == -1)
+        {
+            cout << "Could not send to server! Whoops!!\r\n";
+        }
+    }
+}
+
 int main()
 
 {
@@ -103,9 +225,9 @@ int main()
     strcpy(thing1IpChar, thing1Ip.c_str());
     // string thing3Ip = "";
 
-    int sockfd;
+    //int sockfd;
     char buffer1[MAXLINE];
-    struct sockaddr_in servaddr, cliaddr;
+    //struct sockaddr_in servaddr, cliaddr;
 
     // Creating socket file descriptor
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
@@ -135,8 +257,8 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    int n, sendRe;
-    socklen_t len = sizeof(cliaddr); //len is value/resuslt
+    int n;
+    len = sizeof(cliaddr); //len is value/resuslt
 
     cout << "Waiting for client start..." << endl;
     n = recvfrom(sockfd, (char *)buffer1, MAXLINE,
@@ -173,9 +295,8 @@ int main()
 
     //--------~File transfer~-------------------------------------------------->>>
 
-    //char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
     long long int checkSum = 0123456; //Check sum value for packet contents
-    unsigned short seqNum = 7;        //Sequence number for the packet
+    unsigned short seqNum = 0;        //Sequence number for the packet
 
     string filename = "test.txt";
 
@@ -186,21 +307,12 @@ int main()
     int numBuffers = (int)sizeOfFile / dataSize; //numBuffers will always be an integer
     //int numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer (OG)
     int remainingBytesInFile = (int)sizeOfFile % bufferSize;
-    //cout << "NumBuffers: " << numBuffers << "\n";
-    //cout << "RemainingBytesInFile: " << remainingBytesInFile << "\n";
 
     string numberB = to_string(numBuffers);
     string numberRem = to_string(remainingBytesInFile);
 
     rc = stat(filename.c_str(), &stat_buf);
     sizeOfFile = rc == 0 ? stat_buf.st_size : -1;
-
-    //numBuffers = (int)sizeOfFile / dataSize; //numBuffers will always be an integer
-    //numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer (OG)
-    //remainingBytesInFile = (int)sizeOfFile % bufferSize;
-
-    //numberB = to_string(numBuffers);
-    //numberRem = to_string(remainingBytesInFile);
 
     //---Send necessary info to client before transfer----------------->>>
 
@@ -227,15 +339,17 @@ int main()
                  &len);
 
     } //wait for 'y'
-    //cout << "Start File Transfer." << "\n";
 
     ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
+    
+
     vector<char> buffer(dataSize, 0);
     //vector<char> buffer(bufferSize, 0);
 
-    char finished[1];
+    selectiveRepeatSend(buffer, fin, remainingBytesInFile, numBuffers, bufferSize);
+
+    /* char finished[1];
     finished[0] = 'y';
-    //int numThreads = 5;
     string result;
     for (int i = 0; i < numBuffers; i++)
     {
@@ -253,19 +367,8 @@ int main()
 
         //===================================================================
 
-        //cout << "==========================================>>>\n";
-        //cout << "Sending: " << result << "\n\n";
-        //cout << "==========================================>>>\n\n";
-
-        //char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
-        seqNum += 1;
+        seqNum++;
         char *pkg = packetMaker(seqNum, result.c_str(), result.size());
-
-        /*for (int c = 0; c < result.size() + 6; c++)
-        {
-            printf("%c", pkg[c]);
-        }*/
-
         sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
 
         //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
@@ -281,21 +384,16 @@ int main()
         std::vector<char> lastBuffer(remainingBytesInFile, 0);
         fin.read(lastBuffer.data(), remainingBytesInFile);
         lastBuffString = vecToString(lastBuffer);
-        //cout << "Last Buffer: " << lastBuffString << endl;
 
         char* pkg = packetMaker(seqNum, lastBuffString.c_str(), lastBuffString.size());
         sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr*) & cliaddr,
                            len);
 
-        //printf("Last buffer: %s\n", pkg);
-
-        //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-         //               len);
         if (sendRe == -1)
         {
             cout << "Could not send to server! Whoops!!\r\n";
         }
-    }
+    } */
 
     fin.close();
 
@@ -347,3 +445,4 @@ int main()
 
     return 0;
 }
+
