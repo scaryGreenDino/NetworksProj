@@ -209,7 +209,7 @@ int main()
 
     if (protocol == 1)
     {
-        int cWin = 8;
+        int cWin = 20;
         if (remainingBytes % 8 != 0)
         {
             remainingBytes = (8 - remainingBytes % 8) + remainingBytes;
@@ -247,7 +247,8 @@ int main()
                 cout << "   Packet Sequence Number: " << pkg.sn << endl;
                 cout << "   Packet CheckSum: " << pkg.crc << endl;
                 cout << "\nPacket Data:\n\n"
-                     << pkg.data << endl;
+                     //<< pkg.data
+                     << endl;
                 cout << endl;
                 cout << "=== End Chunk =====================================================================>>>\n\n";
 
@@ -268,7 +269,8 @@ int main()
                         cout << "   Packet Sequence Number: " << pkg.sn << endl;
                         cout << "   Packet CheckSum: " << pkg.crc << endl;
                         cout << "\nPacket Data:\n\n"
-                             << pkg.data << endl;
+                             //<< pkg.data
+                             << endl;
                         cout << endl;
                         cout << "=== End Chunk =====================================================================>>>\n\n";
 
@@ -313,7 +315,8 @@ int main()
             cout << "   Packet Sequence Number: " << pkg.sn << endl;
             cout << "   Packet CheckSum: " << pkg.crc << endl;
             cout << "\nPacket Data:\n\n"
-                 << pkg.data << endl;
+                 //<< pkg.data
+                 << endl;
             cout << endl;
             cout << "=== End Chunk =====================================================================>>>\n\n";
 

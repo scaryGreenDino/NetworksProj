@@ -117,20 +117,20 @@ int main()
     bool defaultSettings = false;
     if (defaultSettings)
     {
-        protocol = 1;
-        packetSize = 1024;
-        timeoutInterval = 10;
-        slidingWindowSize = 50;
-        sequenceNumberRange = 100;
-        situationalErrors = 1;
+        protocol = 1; // this is working
+        packetSize = 20; //this works
+        timeoutInterval = 10; // this  still needs to be done
+        slidingWindowSize = 50; // this works
+        sequenceNumberRange = 100; // this is possibly working
+        situationalErrors = 1; // this still needs to be done
     }
     else
     {
         while (protocol != 1 && protocol != 2)
         {
             cout << "1. Which protocol:" << endl;
-            cout << "1:Go-Back-N" << endl;
-            cout << "2: Selective Repeat" << endl;
+            cout << "  1: Go-Back-N" << endl;
+            cout << "  2: Selective Repeat" << endl;
             cin >> protocol;
         }
         cout << "2. What would you like for size of Packet: ";
@@ -271,16 +271,16 @@ int main()
     //---End Send necessary info to client before transfer-------------->>>
     if (protocol == 1)
     {
-        int WinSize = 5;
+        int WinSize = slidingWindowSize;
         int SWinStart = 0;
         int SWinEnd = 0 + WinSize;
         int currentWindow = 0;
-        int totalPackets = 16;
+        int totalPackets = numBuffers; // this line should be moved
         char start[1];
         start[0] = 'n';
-        int cWinA[8];
+        int cWinA[1];
         cWinA[0] = 8;
-        int counter = 8;
+        int counter = 0;
 
         while (start[0] == 'n')
         {
@@ -333,7 +333,7 @@ int main()
                 {
                     cout << "Could not send to server! Whoops!\r\n";
                 }
-                cout << "Packet " << i << " sent" << endl;
+                cout << "Packet " << i << " with sequence number " << i%sequenceNumberRange << " sent" << endl;
 
                 cout << "Current window = [";
 
@@ -341,7 +341,7 @@ int main()
                 {
                     if ((SWinStart + x) < totalPackets)
                     {
-                        cout << " " << (SWinStart + x);
+                        cout << " " << ((SWinStart + x) % sequenceNumberRange);
                     }
                 }
                 SWinStart++;
@@ -351,7 +351,7 @@ int main()
                          MSG_WAITALL, (struct sockaddr *)&cliaddr,
                          &len);
 
-                cout << "ACK recieved for packet " << counter - 8 << endl;
+                cout << "ACK recieved for packet " << (counter % sequenceNumberRange) << endl;
                 counter = counter + 1;
             }
 
@@ -379,7 +379,7 @@ int main()
                          MSG_WAITALL, (struct sockaddr *)&cliaddr,
                          &len);
 
-                //cout <<"ACK recieved for packet " << counter << endl;
+                cout <<"ACK recieved for packet " << cWinA << endl;
                 counter = counter + 1;
             }
             SWinStart++;
