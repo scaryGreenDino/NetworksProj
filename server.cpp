@@ -74,7 +74,6 @@ char *packetMaker(unsigned short sn, const char *data, int dataSize)
     char csString[csSize];
     char snString[snSize];
 
-
     sprintf(csString, "%X", cs);
     sprintf(snString, "%X", sn);
     for (int c = 0; c < csSize; c++)
@@ -104,15 +103,62 @@ int main()
     strcpy(thing1IpChar, thing1Ip.c_str());
     // string thing3Ip = "";
 
-    int WinSize = 5;
-    int SWinStart = 0;
-    int SWinEnd = 0 + WinSize;
-    int currentWindow = 0;
-    int totalPackets = 16;
-
     int sockfd;
     char buffer1[MAXLINE];
     struct sockaddr_in servaddr, cliaddr;
+
+    int protocol;
+    int packetSize;
+    int timeoutInterval;
+    int slidingWindowSize;
+    int sequenceNumberRange;
+    int situationalErrors;
+    string inputFileName;
+    bool defaultSettings = false;
+    if (defaultSettings)
+    {
+        protocol = 1;
+        packetSize = 1024;
+        timeoutInterval = 10;
+        slidingWindowSize = 50;
+        sequenceNumberRange = 100;
+        situationalErrors = 1;
+    }
+    else
+    {
+        while (protocol != 1 && protocol != 2)
+        {
+            cout << "1. Which protocol:" << endl;
+            cout << "1:Go-Back-N" << endl;
+            cout << "2: Selective Repeat" << endl;
+            cin >> protocol;
+        }
+        cout << "2. What would you like for size of Packet: ";
+        cout << endl;
+        cin >> packetSize;
+
+        cout << "3. Timeout interval: ";
+        cout << endl;
+        cin >> timeoutInterval;
+
+        cout << "4. Size of sliding window: ";
+        cout << endl;
+        cin >> slidingWindowSize;
+
+        cout << "5. Range of sequence numbers: ";
+        cout << endl;
+        cin >> sequenceNumberRange;
+        while (situationalErrors != 1 && situationalErrors != 2)
+        {
+            cout << "6. Situational Errors:" << endl;
+            cout << "1: On" << endl;
+            cout << "2: Off" << endl;
+            cout << endl;
+            cin >> situationalErrors;
+        }
+        cout << "7. Input File Name: ";
+        cin >> inputFileName;
+    }
 
     // Creating socket file descriptor
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
@@ -155,59 +201,58 @@ int main()
     //TODO TAKE USER INPUT FOR BUFFERSIZE
     int header = 6;
     string bufferSizeString = "2056";
-    int bufferSize = stoi(bufferSizeString, NULL, 10);
+    int bufferSize = packetSize;
     int dataSize = bufferSize - header;
 
     length = bufferSizeString.length() + 1;
     char conAck[length];
     strcpy(conAck, bufferSizeString.c_str());
-
-    sendto(sockfd, (const char *)conAck, strlen(conAck),
+    char protocolBuf[sizeof(protocol)];
+    sprintf(protocolBuf, "%d", protocol);
+    char situationalErrorsBuf[sizeof(situationalErrors)];
+    sprintf(situationalErrorsBuf, "%d", situationalErrors);
+    char slidingWindowSizeBuf[sizeof(slidingWindowSize)];
+    sprintf(slidingWindowSizeBuf, "%d", slidingWindowSize);
+    char sequenceNumberRangeBuf[sizeof(sequenceNumberRange)];
+    sprintf(sequenceNumberRangeBuf, "%d", sequenceNumberRange);
+    char packetSizeBuf[sizeof(packetSize)];
+    sprintf(packetSizeBuf, "%d", packetSize);
+    //Send Buffer Size
+    sendto(sockfd, (const char *)packetSizeBuf, sizeof(packetSize),
            MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
            len);
-
+    //Send Protocol
+    sendto(sockfd, (const char *)protocolBuf, sizeof(protocolBuf),
+           MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+           len);
+    //Send Situational Errors
+    sendto(sockfd, (const char *)situationalErrorsBuf, sizeof(situationalErrorsBuf),
+           MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+           len);
+    //Send Sliding Window Size
+    sendto(sockfd, (const char *)slidingWindowSizeBuf, sizeof(slidingWindowSizeBuf),
+           MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+           len);
+    //Send Range of sequence numbers
+    sendto(sockfd, (const char *)sequenceNumberRangeBuf, sizeof(sequenceNumberRangeBuf),
+           MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+           len);
     printf("Connection Ack message sent.\n");
 
-    //----------Prompt User---------------------------------------------------->>>
-
-    //~Prompt Stuff~
-    //(Protocol,Size of Packet,Timeout Interval,Size of Window,Range of Sequence Numbers,Errors)
-
-    //cout << "Input file name for transfer: ";
-    //getline(cin, filename);
-
-    //---------End Prompt User------------------------------------------------->>>
-
-    //--------~File transfer~-------------------------------------------------->>>
-
-    //char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
-    long long int checkSum = 0123456; //Check sum value for packet contents
-    unsigned short seqNum = 7;        //Sequence number for the packet
+    unsigned short seqNum = 7; //Sequence number for the packet
 
     string filename = "test.txt";
 
     struct stat stat_buf;
     int rc = stat(filename.c_str(), &stat_buf);
     int sizeOfFile = rc == 0 ? stat_buf.st_size : -1;
-
-    int numBuffers = (int)sizeOfFile / dataSize; //numBuffers will always be an integer
-    //int numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer (OG)
+    int numBuffers = (int)sizeOfFile / dataSize;
     int remainingBytesInFile = (int)sizeOfFile % bufferSize;
-    //cout << "NumBuffers: " << numBuffers << "\n";
-    //cout << "RemainingBytesInFile: " << remainingBytesInFile << "\n";
-
     string numberB = to_string(numBuffers);
     string numberRem = to_string(remainingBytesInFile);
 
     rc = stat(filename.c_str(), &stat_buf);
     sizeOfFile = rc == 0 ? stat_buf.st_size : -1;
-
-    //numBuffers = (int)sizeOfFile / dataSize; //numBuffers will always be an integer
-    //numBuffers = (int)sizeOfFile / bufferSize; //numBuffers will always be an integer (OG)
-    //remainingBytesInFile = (int)sizeOfFile % bufferSize;
-
-    //numberB = to_string(numBuffers);
-    //numberRem = to_string(remainingBytesInFile);
 
     //---Send necessary info to client before transfer----------------->>>
 
@@ -224,170 +269,123 @@ int main()
     }
 
     //---End Send necessary info to client before transfer-------------->>>
-
-    char start[1];
-    start[0] = 'n';
-    int cWinA[8];
-    cWinA[0]=8;
-    int counter = 8;
-
-
-    while (start[0] == 'n')
+    if (protocol == 1)
     {
-        recvfrom(sockfd, start, 1,
-                 MSG_WAITALL, (struct sockaddr *)&cliaddr,
-                 &len);
+        int WinSize = 5;
+        int SWinStart = 0;
+        int SWinEnd = 0 + WinSize;
+        int currentWindow = 0;
+        int totalPackets = 16;
+        char start[1];
+        start[0] = 'n';
+        int cWinA[8];
+        cWinA[0] = 8;
+        int counter = 8;
 
-    } //wait for 'y'
-    //cout << "Start File Transfer." << "\n";
+        while (start[0] == 'n')
+        {
+            recvfrom(sockfd, start, 1,
+                     MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                     &len);
 
-    ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
-    vector<char> buffer(dataSize, 0);
-    //vector<char> buffer(bufferSize, 0);
+        } //wait for 'y'
+        //cout << "Start File Transfer." << "\n";
 
-    char finished[1];
-    finished[0] = 'y';
-    //int numThreads = 5;
-    string result;
+        ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
+        vector<char> buffer(dataSize, 0);
+        //vector<char> buffer(bufferSize, 0);
 
-    if (currentWindow >= SWinStart && currentWindow <= SWinEnd) {
-      for (int i = 0; i < numBuffers; i++)
-      {
-          fin.read(buffer.data(), buffer.size());
-          result = vecToString(buffer);
+        char finished[1];
+        finished[0] = 'y';
+        //int numThreads = 5;
+        string result;
 
-          //========== Get finish Ack from Client =============================
+        if (currentWindow >= SWinStart && currentWindow <= SWinEnd)
+        {
+            for (int i = 0; i < numBuffers; i++)
+            {
+                fin.read(buffer.data(), buffer.size());
+                result = vecToString(buffer);
 
-          while (finished[0] == 'n')
-          {
-              recvfrom(sockfd, finished, 1, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
-          } //wait for 'y'
+                //========== Get finish Ack from Client =============================
 
-          finished[0] = 'n';
+                while (finished[0] == 'n')
+                {
+                    recvfrom(sockfd, finished, 1, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
+                } //wait for 'y'
 
-          //===================================================================
+                finished[0] = 'n';
 
-          //cout << "==========================================>>>\n";
-          //cout << "Sending: " << result << "\n\n";
-          //cout << "==========================================>>>\n\n";
+                //===================================================================
 
-          //char* packetMaker(long long int cs, unsigned short sn, const char* data, int dataSize)
-          seqNum += 1;
-          char *pkg = packetMaker(seqNum, result.c_str(), result.size());
+                seqNum += 1;
+                char *pkg = packetMaker(seqNum, result.c_str(), result.size());
 
-          /*for (int c = 0; c < result.size() + 6; c++)
+                /*for (int c = 0; c < result.size() + 6; c++)
           {
               printf("%c", pkg[c]);
           }*/
 
-          sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+                sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
 
-          //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-          if (sendRe == -1)
-          {
-              cout << "Could not send to server! Whoops!\r\n";
-          }
-          cout << "Packet " << i << " sent" << endl;
+                //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+                if (sendRe == -1)
+                {
+                    cout << "Could not send to server! Whoops!\r\n";
+                }
+                cout << "Packet " << i << " sent" << endl;
 
-          cout << "Current window = [";
+                cout << "Current window = [";
 
-          for (int x = 0; x <= WinSize; x++) {
-            if ((SWinStart + x) < totalPackets) {
-              cout << " " << (SWinStart + x);
+                for (int x = 0; x <= WinSize; x++)
+                {
+                    if ((SWinStart + x) < totalPackets)
+                    {
+                        cout << " " << (SWinStart + x);
+                    }
+                }
+                SWinStart++;
 
+                cout << "]" << endl;
+                recvfrom(sockfd, cWinA, 1,
+                         MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                         &len);
+
+                cout << "ACK recieved for packet " << counter - 8 << endl;
+                counter = counter + 1;
             }
 
-          }
-          SWinStart++;
+            string lastBuffString;
+            if (fin.good())
+            {
+                std::vector<char> lastBuffer(remainingBytesInFile, 0);
+                fin.read(lastBuffer.data(), remainingBytesInFile);
+                lastBuffString = vecToString(lastBuffer);
+                //cout << "Last Buffer: " << lastBuffString << endl;
 
-          cout << "]" << endl;
-          recvfrom(sockfd, cWinA, 1,
-                   MSG_WAITALL, (struct sockaddr *)&cliaddr,
-                   &len);
+                char *pkg = packetMaker(seqNum, lastBuffString.c_str(), lastBuffString.size());
+                sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+                                len);
+                //printf("Last buffer: %s\n", pkg);
 
-                   cout <<"ACK recieved for packet " << counter - 8 << endl;
-                   counter = counter +1;
-      }
+                //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+                //               len);
+                if (sendRe == -1)
+                {
+                    cout << "Could not send to server! Whoops!!\r\n";
+                }
 
-      string lastBuffString;
-      if (fin.good())
-      {
-          std::vector<char> lastBuffer(remainingBytesInFile, 0);
-          fin.read(lastBuffer.data(), remainingBytesInFile);
-          lastBuffString = vecToString(lastBuffer);
-          //cout << "Last Buffer: " << lastBuffString << endl;
+                recvfrom(sockfd, cWinA, 1,
+                         MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                         &len);
 
-          char* pkg = packetMaker(seqNum, lastBuffString.c_str(), lastBuffString.size());
-          sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr*) & cliaddr,
-                             len);
-          //printf("Last buffer: %s\n", pkg);
-
-          //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
-           //               len);
-          if (sendRe == -1)
-          {
-              cout << "Could not send to server! Whoops!!\r\n";
-          }
-
-          recvfrom(sockfd, cWinA, 1,
-                   MSG_WAITALL, (struct sockaddr *)&cliaddr,
-                   &len);
-
-                   //cout <<"ACK recieved for packet " << counter << endl;
-                  counter = counter +1;
-
-      }
-      SWinStart++;
-      counter++;
-}
-
-    fin.close();
-
-    //--~End File transfer~----------------------------------------------------->>>
-
-    //------Begin Selective Repeat-------------------------------------------------->>>
-
-    //User prompt info
-    /* int winSize = 5; //Total number a frames inside the window
-    numBuffers = 20; //Number of packets that need to be sent
-
-    int seqRange = winSize * 3; //Range of sequence numbers given to the frames
-    int currPacket = 0;         //Counter that keeps track of how many packets have been sent
-    int send[winSize];
-    char recAck[winSize];
-
-    string tempPkg;
-    resetAcks(recAck, winSize);
-
-    for (int i = 1; i <= numBuffers; i++)
-    {
-
-        tempPkg = "Packet #" + to_string(i) + " info.";
-        //cout << pkg << endl;
-
-        if (i % winSize == 0)
-        {
-            //cout << frames[i] << "\n";
-            //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
-
-            sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-
-            //cout << "Acknowledgement of above frames sent is received by sender\n\n";
+                //cout <<"ACK recieved for packet " << counter << endl;
+                counter = counter + 1;
+            }
+            SWinStart++;
+            counter++;
         }
-        else
-        {
-            //cout << frames[i] << " ";
-            //cout << "Sending Packet #" << (currPacket + 1) << "..." << endl;
-            sendRe = sendto(sockfd, tempPkg.c_str(), tempPkg.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
-        }
-
-        //cout << "Current Ack: " << recAck[i % winSize] << endl;
-        currPacket++;
-    } */
-
-    //cout << "End Selective Repeat" << endl;
-
-    //------End Selective Repeat---------------------------------------------------->>>
-
+        fin.close();
+    }
     return 0;
 }
