@@ -55,48 +55,85 @@ string vecToString(vector<char> vec)
     return s;
 }
 
-void resetAcks(char *ackArray, int winSize)
+void initArr(char *ackArray, int* arr, int winSize)
 {
 
     //cout << "Size of ackArray: " << sizeof(ackArray) << endl;
     for (int i = 0; i < winSize; i++)
     {
         ackArray[i] = 'n';
+        arr[i] = i;
+    }
+
+    for (int i = 0; i < winSize; i++)
+    {
+        ackArray[i] = 'n';
     }
 }
 
-void printArr(char *arr, int winSize) {
-
-    //cout << "Size of Arr: " << sizeof(arr) << endl;
-    cout << "Array: ";
-    for (int i = 0; i < winSize; i++)
-    {
-        cout << arr[i] << " ";
-    }
-
-    cout << endl;
-} 
-
-void slide(char *window, int winSize)
-{
-    char tmp[winSize];
-    //cout << "Size of window: " << sizeof(tmp) << endl;
+void printCharArr(char* arr, int winSize) {
+    cout << "Acks = [";
     for (int i = 0; i < winSize; i++)
     {
         if (i < (winSize-1)) {
-            tmp[i] = window[i + 1];
-            //cout << tmp[i] << " ";
+            cout << arr[i] << ", ";
         }
         else {
-            tmp[i] = 'n';
-            //cout << tmp[i] << endl;
+            cout << arr[i] << "]\n";
         }
     }
+} 
 
-    strcpy(window, tmp);
+void printIntArr(int* arr, int winSize) {
+    cout << "Current window = [";
+    for (int i = 0; i < winSize; i++)
+    {
+        if (i < (winSize - 1)) {
+            cout << arr[i] << ", ";
+        }
+        else {
+            cout << arr[i] << "]\n";
+        }
+    }
 }
 
+int slide(char *window, int* arr, int base, int winSize)
+{
+    char tmpC[winSize];
+    int tmpI[winSize];
+    while (window[0] == 'y')
+    {
+        for (int j = 0; j < winSize; j++) {
+            if (j < (winSize - 1)) {
+                tmpC[j] = window[j + 1];
+                tmpI[j] = arr[j + 1];
+            }
+            else if ((winSize + base) >= (winSize * 3)) { //Edge Case
+                tmpC[j] = 'n';
+                tmpI[j] = (base + winSize) - (winSize * 3);
+                base++;
+            }
+            else {
+                tmpC[j] = 'n';
+                tmpI[j] = base + winSize;
+                base++;
+            }
 
+            if (base >= (winSize * 3)) { //Resets the first entry back to zero
+                base = 0;
+            }
+
+            //cout << "Ack Arr[" << j << "]: " << tmpC[j] << endl;
+            //cout << "Send Arr[" << j << "]: " << tmpI[j] << endl;
+        }
+
+        strcpy(window, tmpC);
+        memcpy(arr, tmpI, winSize*sizeof(int));
+
+    }
+
+    return base;
+}
 
 char *packetMaker(unsigned short sn, const char *data, int dataSize)
 {
@@ -134,33 +171,30 @@ char *packetMaker(unsigned short sn, const char *data, int dataSize)
 
 void selectiveRepeatSend(vector<char> buffer, ifstream &fin, int remainingBytesInFile, int numBuffers, int bufferSize) {
 
-    int seqNum = 1;
+    int seqNum = 0;
     int winSize = 5; //Total number a frames inside the window
     int seqRange = winSize * 3; //Range of sequence numbers given to the frames
-    int currPacket = 0;         //Counter that keeps track of how many packets have been sent
+    int base = 0;         //Counter that keeps track of how many packets have been sent
     int send[winSize];
     char recAck[winSize];
     char* pktStore[numBuffers]; //Stores each packet for reference if any get lost
 
-    //cout << "Size of recAck: " << sizeof(recAck) << endl;
-    resetAcks(recAck, winSize);
-    //cout << "Size of recAck(After Reset): " << sizeof(recAck) << endl;
+    initArr(recAck, send, winSize);
 
-  /*  printArr(recAck, winSize);
+    /*//printCharArr(recAck, winSize);
     recAck[0] = 'y';
-    recAck[1] = 'y';
+    //recAck[1] = 'y';
     recAck[2] = 'y';
-    printArr(recAck, winSize);
-
     recAck[3] = 'y';
-    recAck[4] = 'y';
-    printArr(recAck, winSize);
-    slide(recAck, winSize);
-    printArr(recAck, winSize);
-    slide(recAck, winSize);
-    slide(recAck, winSize);
-    printArr(recAck, winSize);*/
+    //printCharArr(recAck, winSize);
 
+    //recAck[4] = 'y';
+    printCharArr(recAck, winSize);
+    printIntArr(send, winSize);
+
+    base = slide(recAck, send, base, winSize);
+    printCharArr(recAck, winSize);
+    printIntArr(send, winSize);*/
 
     char finished[1];
     finished[0] = 'y';
@@ -175,17 +209,26 @@ void selectiveRepeatSend(vector<char> buffer, ifstream &fin, int remainingBytesI
         while (finished[0] == 'n')
         {
             recvfrom(sockfd, finished, 1, MSG_WAITALL, (struct sockaddr*) & cliaddr, &len);
+            //cout << "Ack " << seqNum << " recieved.\n";
+
         } //wait for 'y'
 
         finished[0] = 'n';
 
         //===================================================================
 
+        cout << "Packet " << seqNum << " sent.\n";
         char* pkg = packetMaker(seqNum, result.c_str(), result.size());
         pktStore[seqNum - 1] = pkg;
         sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr*) & cliaddr, len);
         //printf("Packet Storage Array: %s\n", pktStore[seqNum - 1]);
-        seqNum++;
+        if (seqNum >= seqRange) {
+            seqNum = 0;
+        }
+        else {
+            seqNum++;
+        }
+        
 
         //sendRe = sendto(sockfd, result.c_str(), result.size(), MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
         if (sendRe == -1)
