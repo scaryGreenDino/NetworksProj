@@ -29,6 +29,9 @@ using namespace std;
 // Driver code
 
 const uint32_t Polynomial = 0xEDB88320;
+int sockfd, sendRe;
+struct sockaddr_in servaddr, cliaddr;
+socklen_t len;
 
 uint32_t crc32_bitwise(const void *data, size_t length, uint32_t previousCrc32 = 0)
 {
@@ -52,14 +55,101 @@ string vecToString(vector<char> vec)
     return s;
 }
 
-void resetAcks(char *ackArray, int winSize)
+void initArr(char *ackArray, int *arr, int winSize)
 {
 
-    //char ackArray[winSize];
+    for (int i = 0; i < winSize; i++)
+    {
+        ackArray[i] = 'n';
+        arr[i] = i;
+    }
+
     for (int i = 0; i < winSize; i++)
     {
         ackArray[i] = 'n';
     }
+}
+
+void printCharArr(char *arr, int winSize)
+{
+    cout << "Acks = [";
+    for (int i = 0; i < winSize; i++)
+    {
+        if (i < (winSize - 1))
+        {
+            cout << arr[i] << ", ";
+        }
+        else
+        {
+            cout << arr[i] << "]\n";
+        }
+    }
+}
+
+void printIntArr(int *arr, int winSize)
+{
+    cout << "Current window = [";
+    for (int i = 0; i < winSize; i++)
+    {
+        if (i < (winSize - 1))
+        {
+            cout << arr[i] << ", ";
+        }
+        else
+        {
+            cout << arr[i] << "]\n";
+        }
+    }
+}
+
+void isReceived(char *window, int *arr, int seqNum, int winSize)
+{
+    for (int j = 0; j < winSize; j++)
+    {
+        if (arr[j] == seqNum)
+        {
+            window[j] = 'y';
+        }
+    }
+}
+
+int slide(char *window, int *arr, int base, int winSize)
+{
+    char tmpC[winSize];
+    int tmpI[winSize];
+    while (window[0] == 'y')
+    {
+        for (int j = 0; j < winSize; j++)
+        {
+            if (j < (winSize - 1))
+            {
+                tmpC[j] = window[j + 1];
+                tmpI[j] = arr[j + 1];
+            }
+            else if ((winSize + base) >= (winSize * 3))
+            { //Edge Case
+                tmpC[j] = 'n';
+                tmpI[j] = (base + winSize) - (winSize * 3);
+                base++;
+            }
+            else
+            {
+                tmpC[j] = 'n';
+                tmpI[j] = base + winSize;
+                base++;
+            }
+
+            if (base >= (winSize * 3))
+            { //Resets the first entry back to zero
+                base = 0;
+            }
+        }
+
+        strcpy(window, tmpC);
+        memcpy(arr, tmpI, winSize * sizeof(int));
+    }
+
+    return base;
 }
 
 char *packetMaker(unsigned short sn, const char *data, int dataSize)
@@ -76,6 +166,9 @@ char *packetMaker(unsigned short sn, const char *data, int dataSize)
 
     sprintf(csString, "%X", cs);
     sprintf(snString, "%X", sn);
+
+    //printf("Header: %s%s\n", csString, snString);
+
     for (int c = 0; c < csSize; c++)
     {
         packet[c] = csString[c];
@@ -93,6 +186,86 @@ char *packetMaker(unsigned short sn, const char *data, int dataSize)
     return packet;
 }
 
+void selectiveRepeatSend(vector<char> buffer, ifstream &fin, int remainingBytesInFile, int numBuffers, int bufferSize)
+{
+
+    int seqNum = 0;
+    int winSize = 5;            //Total number a frames inside the window
+    int seqRange = winSize * 3; //Range of sequence numbers given to the frames
+    int base = 0;               //Counter that keeps track of how many packets have been sent
+    int send[winSize];
+    char recAck[winSize];
+    char *pktStore[numBuffers]; //Stores each packet for reference if any get lost
+
+    initArr(recAck, send, winSize);
+    printIntArr(send, winSize);
+    //printCharArr(recAck, winSize);
+
+    char buf[5];
+    int recSN;
+    string::size_type sz;
+    string result;
+    for (int i = 0; i < numBuffers; i++)
+    {
+        memset(buf, 0, sizeof(buf));
+        fin.read(buffer.data(), buffer.size());
+        result = vecToString(buffer);
+
+        cout << "Packet " << seqNum << " sent.\n";
+        char *pkg = packetMaker(seqNum, result.c_str(), result.size());
+        pktStore[seqNum - 1] = pkg;
+        sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr *)&cliaddr, len);
+        if (sendRe == -1)
+        {
+            cout << "Could not send to server! Whoops!\r\n";
+        }
+
+        if (seqNum >= seqRange)
+        {
+            seqNum = 0;
+        }
+        else
+        {
+            seqNum++;
+        }
+
+        recvfrom(sockfd, (char *)buf, sizeof(buf), MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
+        recSN = stoi(buf, &sz);
+        cout << "Ack " << recSN << " received.\n";
+        isReceived(recAck, send, recSN, winSize);
+        base = slide(recAck, send, base, winSize);
+        printIntArr(send, winSize);
+        //printCharArr(recAck, winSize);
+    }
+
+    string lastBuffString;
+    if (fin.good())
+    {
+        std::vector<char> lastBuffer(remainingBytesInFile, 0);
+        fin.read(lastBuffer.data(), remainingBytesInFile);
+        lastBuffString = vecToString(lastBuffer);
+
+        char *pkg = packetMaker(seqNum, lastBuffString.c_str(), lastBuffString.size());
+        pktStore[seqNum - 1] = pkg;
+        sendRe = sendto(sockfd, pkg, bufferSize, MSG_CONFIRM, (const struct sockaddr *)&cliaddr,
+                        len);
+        seqNum++;
+
+        recvfrom(sockfd, (char *)buf, sizeof(buf), MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
+        recSN = stoi(buf, &sz);
+
+        cout << "Ack " << recSN << " received.\n";
+        isReceived(recAck, send, recSN, winSize);
+        base = slide(recAck, send, base, winSize);
+        printIntArr(send, winSize);
+        //printCharArr(recAck, winSize);
+
+        if (sendRe == -1)
+        {
+            cout << "Could not send to server! Whoops!!\r\n";
+        }
+    }
+}
 int main()
 
 {
@@ -114,10 +287,10 @@ int main()
     int sequenceNumberRange;
     int situationalErrors;
     string inputFileName;
-    bool defaultSettings = false;
+    bool defaultSettings = true;
     if (defaultSettings)
     {
-        protocol = 1;
+        protocol = 2;
         packetSize = 1024;
         timeoutInterval = 10;
         slidingWindowSize = 50;
@@ -269,6 +442,24 @@ int main()
     }
 
     //---End Send necessary info to client before transfer-------------->>>
+
+    char start[1];
+    start[0] = 'n';
+    while (start[0] == 'n')
+    {
+        recvfrom(sockfd, start, 1,
+                 MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                 &len);
+
+    } //wait for 'y'
+    //cout << "Start File Transfer." << "\n";
+
+    ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
+    vector<char> buffer(dataSize, 0);
+    if (protocol == 2)
+    {
+        selectiveRepeatSend(buffer, fin, remainingBytesInFile, numBuffers, bufferSize);
+    }
     if (protocol == 1)
     {
         int WinSize = 5;
@@ -276,23 +467,10 @@ int main()
         int SWinEnd = 0 + WinSize;
         int currentWindow = 0;
         int totalPackets = 16;
-        char start[1];
-        start[0] = 'n';
         int cWinA[8];
         cWinA[0] = 8;
         int counter = 8;
 
-        while (start[0] == 'n')
-        {
-            recvfrom(sockfd, start, 1,
-                     MSG_WAITALL, (struct sockaddr *)&cliaddr,
-                     &len);
-
-        } //wait for 'y'
-        //cout << "Start File Transfer." << "\n";
-
-        ifstream fin(filename.c_str(), std::ios::in | std::ios::binary);
-        vector<char> buffer(dataSize, 0);
         //vector<char> buffer(bufferSize, 0);
 
         char finished[1];
