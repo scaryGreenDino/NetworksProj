@@ -21,7 +21,6 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include "checksum.h"
 
 #define PORT 9086
 #define MAXLINE 1024
@@ -288,7 +287,7 @@ int main()
     int situationalErrors;
     string inputFileName;
     int faultyPacketNumber;
-    bool defaultSettings = true;
+    bool defaultSettings = false;
     int regCounter = 0;
     if (defaultSettings)
     {
@@ -312,28 +311,31 @@ int main()
         cout << "2. What would you like for size of Packet: ";
         cout << endl;
         cin >> packetSize;
+        // cout << "3. Timeout interval: ";
+        // cout << endl;
+        // cin >> timeoutInterval;
+        // timeoutInterval = timeoutInterval * 1000000;
+        timeoutInterval = 500000; // this  still needs to be done
+        faultyPacketNumber = 3;
 
-        cout << "3. Timeout interval: ";
-        cout << endl;
-        cin >> timeoutInterval;
-        timeoutInterval = timeoutInterval * 1000000;
-
-        cout << "4. Size of sliding window: ";
+        cout << "3. Size of sliding window: ";
         cout << endl;
         cin >> slidingWindowSize;
 
-        cout << "5. Range of sequence numbers: ";
+        cout << "4. Range of sequence numbers: ";
         cout << endl;
         cin >> sequenceNumberRange;
-        while (situationalErrors != 1 && situationalErrors != 2)
-        {
-            cout << "6. Situational Errors:" << endl;
-            cout << "1: On" << endl;
-            cout << "2: Off" << endl;
-            cout << endl;
-            cin >> situationalErrors;
-        }
-        cout << "7. Input File Name: ";
+        // while (situationalErrors != 1 && situationalErrors != 2)
+        // {
+        //     cout << "5. Situational Errors:" << endl;
+        //     cout << "1: On" << endl;
+        //     cout << "2: Off" << endl;
+        //     cout << endl;
+        //     cin >> situationalErrors;
+        // }
+        situationalErrors = 1; // this still needs to be done
+
+        cout << "5. Input File Name: ";
         cin >> inputFileName;
     }
 
@@ -454,7 +456,6 @@ int main()
         recvfrom(sockfd, start, 1,
                  MSG_WAITALL, (struct sockaddr *)&cliaddr,
                  &len);
-
     } //wait for 'y'
     //cout << "Start File Transfer." << "\n";
 
