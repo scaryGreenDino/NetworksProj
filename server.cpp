@@ -284,26 +284,29 @@ int main()
     int packetSize;
     int timeoutInterval;
     int slidingWindowSize;
-    int sequenceNumberRange;
+    long int sequenceNumberRange;
     int situationalErrors;
     string inputFileName;
+    int faultyPacketNumber;
     bool defaultSettings = true;
+    int regCounter = 0;
     if (defaultSettings)
     {
-        protocol = 2;
-        packetSize = 1024;
-        timeoutInterval = 10;
-        slidingWindowSize = 50;
-        sequenceNumberRange = 100;
-        situationalErrors = 1;
+        protocol = 1;              // this is working
+        packetSize = 20;           //this works
+        timeoutInterval = 500000;  // this  still needs to be done
+        slidingWindowSize = 50;    // this works
+        sequenceNumberRange = 100; // this is possibly working
+        situationalErrors = 1;     // this still needs to be done
+        faultyPacketNumber = 3;
     }
     else
     {
         while (protocol != 1 && protocol != 2)
         {
             cout << "1. Which protocol:" << endl;
-            cout << "1:Go-Back-N" << endl;
-            cout << "2: Selective Repeat" << endl;
+            cout << "  1: Go-Back-N" << endl;
+            cout << "  2: Selective Repeat" << endl;
             cin >> protocol;
         }
         cout << "2. What would you like for size of Packet: ";
@@ -313,6 +316,7 @@ int main()
         cout << "3. Timeout interval: ";
         cout << endl;
         cin >> timeoutInterval;
+        timeoutInterval = timeoutInterval * 1000000;
 
         cout << "4. Size of sliding window: ";
         cout << endl;
@@ -419,8 +423,8 @@ int main()
     struct stat stat_buf;
     int rc = stat(filename.c_str(), &stat_buf);
     int sizeOfFile = rc == 0 ? stat_buf.st_size : -1;
-    int numBuffers = (int)sizeOfFile / dataSize;
-    int remainingBytesInFile = (int)sizeOfFile % bufferSize;
+    long int numBuffers = (int)sizeOfFile / dataSize;
+    long int remainingBytesInFile = (int)sizeOfFile % bufferSize;
     string numberB = to_string(numBuffers);
     string numberRem = to_string(remainingBytesInFile);
 
@@ -462,14 +466,16 @@ int main()
     }
     if (protocol == 1)
     {
-        int WinSize = 5;
-        int SWinStart = 0;
-        int SWinEnd = 0 + WinSize;
-        int currentWindow = 0;
-        int totalPackets = 16;
-        int cWinA[8];
+        int WinSize = slidingWindowSize;
+        long int SWinStart = 0;
+        long int SWinEnd = 0 + WinSize;
+        long int currentWindow = 0;
+        long int totalPackets = numBuffers; // this line should be moved
+        char start[1];
+        start[0] = 'n';
+        int cWinA[1];
         cWinA[0] = 8;
-        int counter = 8;
+        long int counter = 0;
 
         //vector<char> buffer(bufferSize, 0);
 
@@ -480,7 +486,7 @@ int main()
 
         if (currentWindow >= SWinStart && currentWindow <= SWinEnd)
         {
-            for (int i = 0; i < numBuffers; i++)
+            for (long int i = 0; i < numBuffers; i++)
             {
                 fin.read(buffer.data(), buffer.size());
                 result = vecToString(buffer);
@@ -511,7 +517,7 @@ int main()
                 {
                     cout << "Could not send to server! Whoops!\r\n";
                 }
-                cout << "Packet " << i << " sent" << endl;
+                cout << "Packet " << i << " with sequence number " << i % sequenceNumberRange << " sent" << endl;
 
                 cout << "Current window = [";
 
@@ -519,18 +525,33 @@ int main()
                 {
                     if ((SWinStart + x) < totalPackets)
                     {
-                        cout << " " << (SWinStart + x);
+                        cout << " " << ((SWinStart + x) % sequenceNumberRange);
                     }
                 }
                 SWinStart++;
 
                 cout << "]" << endl;
-                recvfrom(sockfd, cWinA, 1,
-                         MSG_WAITALL, (struct sockaddr *)&cliaddr,
-                         &len);
 
-                cout << "ACK recieved for packet " << counter - 8 << endl;
-                counter = counter + 1;
+                if (regCounter % faultyPacketNumber == 0)
+                {
+                    //  usleep(timeoutInterval);
+                    cout << "packet " << i << " with sequence number " << i % sequenceNumberRange << " timed out" << endl;
+                    cout << "Packet " << i << " with sequence number " << i % sequenceNumberRange << " has been resent" << endl;
+                    recvfrom(sockfd, cWinA, 1,
+                             MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                             &len);
+                    cout << "ACK recieved for packet " << (counter % sequenceNumberRange) << endl;
+                    counter++;
+                }
+                else
+                {
+                    recvfrom(sockfd, cWinA, 1,
+                             MSG_WAITALL, (struct sockaddr *)&cliaddr,
+                             &len);
+                    cout << "ACK recieved for packet " << (counter % sequenceNumberRange) << endl;
+                    counter++;
+                }
+                regCounter++;
             }
 
             string lastBuffString;
@@ -557,7 +578,7 @@ int main()
                          MSG_WAITALL, (struct sockaddr *)&cliaddr,
                          &len);
 
-                //cout <<"ACK recieved for packet " << counter << endl;
+                cout << "ACK recieved for packet " << cWinA << endl;
                 counter = counter + 1;
             }
             SWinStart++;
