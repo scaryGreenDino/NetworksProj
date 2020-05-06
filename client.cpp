@@ -235,7 +235,7 @@ int main()
         //struct Packet pkg;
         //cout << "Number of Buffers:" << numBuffers << endl;
 
-        for (int i = 0; i < numBuffers; i++)
+        for (long int i = 0; i < numBuffers; i++)
         {
             memset(buf, 0, bufferSize);
             bytesReceived = recvfrom(sockfd, (char *)buf, bufferSize + 6, MSG_WAITALL, (struct sockaddr *)&servaddr, &len);
